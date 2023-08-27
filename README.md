@@ -23,8 +23,8 @@ This project is based on the original code of the [inteoryx / twitter-video-dl](
 
 1. Download [Shortcuts](https://apps.apple.com/us/app/shortcuts/id915249334) and [a-Shell](https://apps.apple.com/jp/app/a-shell/id1473805438) from the AppStore
 2. Add Shortcut to save Twitter videos
-   * twitter-video-dl-sc setup ([iCloud Link](https://www.icloud.com/shortcuts/bd16e0c04216423ca98a1bacbf866915))
-   * twitter-video-dl-sc ([iCloud Link](https://www.icloud.com/shortcuts/20e82f767f354607a4ebfa84de3e45b0))
+   * twitter-video-dl-sc setup ([iCloud Link](https://www.icloud.com/shortcuts/720e7d9fdbac41368e28e0406ed9579a))
+   * twitter-video-dl-sc ([iCloud Link](https://www.icloud.com/shortcuts/91fab627570f412d89a71d5badc39259))
 3. Run the ***twitter-video-dl-sc setup*** setup shortcut  
    * DL [git](https://github.com/holzschu/a-Shell-commands/releases/download/0.1/git) command from [
 a-Shell-commands](https://github.com/holzschu/a-Shell-commands)
