@@ -4,7 +4,7 @@ description = "This project is based on the original code of the [inteoryx / twi
 license = "Unlicense"
 name = "twitter-video-dl-for-sc"
 readme = "README.md"
-version = "0.1.0"
+version = "0.2.1"
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -16,12 +16,13 @@ ruff = "^0.0.292"
 taskipy = "^1.12.0"
 ffmpeg-python = "^0.2.0"
 pre-commit = "^3.4.0"
+tomlkit = "^0.12.1"
 
 [tool.taskipy.tasks]
 # poetry run task [task]
-blackfix = "poetry run black twitter-video-dl-for-sc.py twitter-video-dl.py src tests"
-ruffcheck = "poetry run ruff twitter-video-dl-for-sc.py twitter-video-dl.py src tests "
-rufffix = "poetry run ruff twitter-video-dl-for-sc.py twitter-video-dl.py src tests --fix"
+blackfix = "poetry run black twitter-video-dl-for-sc.py twitter-video-dl.py src tests ci"
+ruffcheck = "poetry run ruff twitter-video-dl-for-sc.py twitter-video-dl.py src tests ci"
+rufffix = "poetry run ruff twitter-video-dl-for-sc.py twitter-video-dl.py src tests ci --fix"
 
 [tool.black]
 target-version = ['py310']
