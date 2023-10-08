@@ -1,5 +1,6 @@
-import src.twitter_video_dl.twitter_video_dl as tvdl
 import argparse
+
+import src.twitter_video_dl.twitter_video_dl as tvdl
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -9,17 +10,17 @@ if __name__ == "__main__":
     parser.add_argument(
         "twitter_url",
         type=str,
-        help="Twitter URL to download.  e.g. https://twitter.com/GOTGTheGame/status/1451361961782906889"
+        help="Twitter URL to download.  e.g. https://x.com/tw_7rikazhexde/status/1710868951109124552?s=20",
     )
 
     parser.add_argument(
         "file_name",
         type=str,
-        help="Save twitter video to this filename. e.g. twittervid.mp4"
+        help="Save twitter video to this filename. e.g. twittervid.mp4",
     )
 
     args = parser.parse_args()
 
     file_name = args.file_name
 
-    tvdl.download_video_for_cs(args.twitter_url, args.file_name)
+    tvdl.download_video_for_sc(args.twitter_url, args.file_name)
