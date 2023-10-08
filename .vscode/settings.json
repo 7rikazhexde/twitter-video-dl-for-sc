@@ -13,5 +13,8 @@
                           // Disable MD009 because it uses <br/> for line breaks instead of disabling it.
         //"MD040": false  // Fenced code blocks should have a language specified / フェンスされたコードブロックには言語を指定する必要があります
                           // Code block highlighting is recommended.
+    },
+    "files.exclude": {
+        "**/.git": false
     }
 }
