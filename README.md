@@ -43,8 +43,8 @@ ffmpeg version 6.0 Copyright (c) 2000-2023 the FFmpeg developers
 
 1. Download [Shortcuts](https://apps.apple.com/us/app/shortcuts/id915249334) and [a-Shell](https://apps.apple.com/jp/app/a-shell/id1473805438) from the AppStore
 2. Add Shortcut to save Twitter videos
-   * twitter-video-dl-sc setup ([iCloud Link](https://www.icloud.com/shortcuts/720e7d9fdbac41368e28e0406ed9579a))
-   * twitter-video-dl-sc ([iCloud Link](https://www.icloud.com/shortcuts/91fab627570f412d89a71d5badc39259))
+   * twitter-video-dl-sc setup ([iCloud Link](https://www.icloud.com/shortcuts/a6adf3692039454a8168f7221b808c67))
+   * twitter-video-dl-sc ([iCloud Link](https://www.icloud.com/shortcuts/ecbc62aa449c4e2cb4fea1e8eec9d168))
 3. Run the ***twitter-video-dl-sc setup*** setup shortcut  
    * DL [git](https://github.com/holzschu/a-Shell-commands/releases/download/0.1/git) command from [
 a-Shell-commands](https://github.com/holzschu/a-Shell-commands)
