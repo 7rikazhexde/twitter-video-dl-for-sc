@@ -1,6 +1,6 @@
 # twitter-video-dl-for-sc
 
-This project is based on the original code of the [inteoryx / twitter-video-dl](https://github.com/inteoryx/twitter-video-dl) project, which allows users to download Twitter videos as MP4 files using only Python and URLs without the need for API keys or ffmpeg. I forked this project for use in iOS Shortcuts applications.
+This project is based on the original code of the [inteoryx / twitter-video-dl](https://github.com/inteoryx/twitter-video-dl) project, which allows users to download Twitter videos as MP4 files using Python, FFmpeg and URLs without the need for API keys. I forked this project for use in iOS Shortcuts application.
 
 ## Demo (Shortcuts)
 
@@ -12,11 +12,31 @@ This project is based on the original code of the [inteoryx / twitter-video-dl](
 
 ## Usage
 
+### Installing FFmpeg
+
+> **Note**ℹ️:<br />
+> **- Use the ffmpeg command to save GIF files.**  
+> **- GIF files are converted from MP4 files; if you do not need to save GIF files, set `"convert_gif_flag": false` in `settings.json`.**  
+> **- For shortcuts, the a-Shell application used supports ffmpeg, so installation is not necessary.**  
+> **- The actual version information displayed below may vary from one system to another; but if a message such as ffmpeg: command not found appears instead of the version information, FFmpeg is not properly installed.**  
+
+In order to execute the code, FFmpeg must be installed and accessible via the $PATH environment variable.
+
+There are a variety of ways to install FFmpeg, such as the official download links, or using your package manager of choice (e.g. sudo apt install ffmpeg on Debian/Ubuntu, brew install ffmpeg on OS X, etc.).
+
+Regardless of how FFmpeg is installed, you can check if your environment path is set correctly by running the ffmpeg command from the terminal, in which case the version information should appear, as in the following example (truncated for brevity):
+
+```bash
+ffmpeg
+ffmpeg version 6.0 Copyright (c) 2000-2023 the FFmpeg developers
+  built with Apple clang version 14.0.3 (clang-1403.0.22.14.1)
+```
+
 ### For Shortcuts
 
 > **Note**ℹ️:<br />
-> **Currently only Japanese language support is available.**  
-> **It has been tested on iPhone and iPad, but not on Mac.**  
+> **- Currently only Japanese language support is available.**  
+> **- It has been tested on iPhone and iPad, but not on Mac.**  
 >
 > **Warning**⚠️:<br />
 > **Be sure to review the notes, limitations, and comments in the comments when performing shortcuts.**  
@@ -49,7 +69,7 @@ python twitter-video-dl-for-sc.py https://twitter.com/i/status/16508041129871360
 
 ```bash
 # Without file name
-python twitter-video-dl-for-sc.py https://twitter.com/i/status/1650804112987136000 "" 
+python twitter-video-dl-for-sc.py https://twitter.com/i/status/1650804112987136000 ""
 ```
 
 Done, now you should have an mp4 file of the highest bitrate version of that video available.

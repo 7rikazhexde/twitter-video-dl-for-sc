@@ -2,19 +2,21 @@
 Tests for the module.  Tests require ffmpeg to be installed.
 ffmpeg is not listed as a dependency in the setup.py file because it is only required for the tests.
 """
-import sys
 import os
+import sys
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-import ffmpeg
 import json
 import unittest
+
+import ffmpeg
+
 from src.twitter_video_dl import twitter_video_dl as tvdl
 
-class VideoDLTester(unittest.TestCase):
 
+class VideoDLTester(unittest.TestCase):
     TOLERANCE = 0.05
     VIDEO_LIST = "TestVideos.json"
-
 
     def test_download_videos_from_list(self):
         """
@@ -37,11 +39,18 @@ class VideoDLTester(unittest.TestCase):
             expected_size = float(video["size"])
 
             # Check duration and size are within tolerances.
-            self.assertAlmostEqual(actual_duration, expected_duration, delta=(self.TOLERANCE * expected_duration))
-            self.assertAlmostEqual(actual_size, expected_size, delta=(self.TOLERANCE * expected_size))
+            self.assertAlmostEqual(
+                actual_duration,
+                expected_duration,
+                delta=(self.TOLERANCE * expected_duration),
+            )
+            self.assertAlmostEqual(
+                actual_size, expected_size, delta=(self.TOLERANCE * expected_size)
+            )
 
             os.remove("test.mp4")
             print("Passed: ", video["url"])
+
 
 if __name__ == "__main__":
     unittest.main()
