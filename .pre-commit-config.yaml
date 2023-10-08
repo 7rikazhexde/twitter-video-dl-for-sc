@@ -1,0 +1,56 @@
+# pre-commit stop running hooks after the first failure.
+fail_fast: true
+# A list of repository mappings
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    # Specify version or tag to use (as of 23.5.31)
+    rev: v4.4.0
+    hooks:
+      # Remove spaces at end of lines except markdown
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      # Make the last line of the file a newline code
+      - id: end-of-file-fixer
+      # Unify line break code to LF
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      # toml syntax check
+      - id: check-toml
+      # yaml syntax check
+      - id: check-yaml
+
+  # https://python-poetry.org/docs/pre-commit-hooks/#usage
+  - repo: https://github.com/python-poetry/poetry
+    # Cannot be executed with local designation (as of 23.10.8)
+    rev: 1.6.1
+    hooks:
+      - id: poetry-check
+        verbose: true
+      - id: poetry-lock
+        verbose: true
+      - id: poetry-export
+        args: ["-f", "requirements.txt", "-o", "requirements.txt"]
+        verbose: true
+        files: ^pyproject\.toml$
+      - id: poetry-export
+        name: poetry-export-dev
+        args: ["--dev", "-f", "requirements.txt", "-o", "requirements-dev.txt"]
+        verbose: true
+        files: ^pyproject\.toml$
+
+  # Repository local hooks
+  - repo: local
+    hooks:
+    -   id: black
+        name: black
+        stages: [commit]
+        language: system
+        entry: poetry run task blackfix
+        types: [python]
+
+    -   id: ruff
+        name: ruff
+        stages: [commit]
+        language: system
+        entry: poetry run task rufffix
+        types: [python]

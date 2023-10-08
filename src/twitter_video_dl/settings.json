@@ -1,0 +1,9 @@
+{
+  "title": "Setting for twitter-video-dl-for-sc",
+  "gif": {
+    "convert_gif_flag": true
+  },
+  "ffmpeg": {
+    "loglevel": "error"
+  }
+}
