@@ -42,7 +42,15 @@ def get_tokens(tweet_url):
     4. Now that we have the bearer token, how do we get the guest id?  Easy, we activate the bearer token to get it.
     """
 
-    html = requests.get(tweet_url)
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0",
+        "Accept": "*/*",
+        "Accept-Language": "de,en-US;q=0.7,en;q=0.3",
+        "Accept-Encoding": "gzip, deflate, br",
+        "TE": "trailers",
+    }
+
+    html = requests.get(tweet_url, headers=headers)
 
     assert (
         html.status_code == 200
@@ -58,7 +66,6 @@ def get_tokens(tweet_url):
     ), f"Failed to find main.js file.  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Tweet url: {tweet_url}"
 
     mainjs_url = mainjs_url[0]
-
     mainjs = requests.get(mainjs_url)
 
     assert (
@@ -502,7 +509,7 @@ def download_video(tweet_url, output_file, target_all_videos=False):
                             f.flush()
 
 
-def download_video_for_sc(tweet_url, output_file=""):
+def download_video_for_sc(tweet_url, output_file="", output_folder_path="./output"):
     """
     In cases where multiple videos are posted in a single tweet, each video will be saved.
     However, there are cases where videos cannot be saved depending on the content of the video or
@@ -513,10 +520,6 @@ def download_video_for_sc(tweet_url, output_file=""):
     resp = get_tweet_details(tweet_url, guest_token, bearer_token)
     mp4_ids, mp4s, twvdlst = extract_mp4_fmp4(resp.text)
     m3u8s = list(set([mp4["url"] for mp4 in mp4s if "m3u8" in mp4["url"]]))
-    # print(f'mp4_ids: {mp4_ids}')
-    # print(f'mp4s: {mp4s}')
-    # print(f'twvdlst: {twvdlst}')
-    # print(f'm3u8s: {m3u8s}')
 
     if not m3u8s:
         # Get request
@@ -562,11 +565,10 @@ def download_video_for_sc(tweet_url, output_file=""):
             gif_flag = True
         num = len(video_url_list)
         for index, max_resolution_url in enumerate(video_url_list):
-            # print(f'max_resolution_url:{max_resolution_url}')
             response = requests.get(max_resolution_url)
             if response.status_code == 200:
-                if not os.path.exists("output"):
-                    os.makedirs("output")
+                if not os.path.exists(output_folder_path):
+                    os.makedirs(output_folder_path)
                 if "/ext_tw_video/" in max_resolution_url:
                     mp4_id = max_resolution_url.split("/ext_tw_video/")[-1].split("/")[
                         0
@@ -595,31 +597,34 @@ def download_video_for_sc(tweet_url, output_file=""):
                         output_file_name = f"{output_file}_{index+1}"
                     else:
                         output_file_name = f"{output_file}"
-                # print(f'output_file_name: {output_file_name}')
                 # mp4 file output
-                with open(f"output/{output_file_name}.mp4", "wb") as f:
+                with open(f"{output_folder_path}/{output_file_name}.mp4", "wb") as f:
                     f.write(response.content)
-                    print(f"Video Output Success: output/{output_file_name}.mp4")
+                    print(
+                        f"Video Output Success: {output_folder_path}/{output_file_name}.mp4"
+                    )
                 # Covert mp4 to gif
                 if convert_gif_flag and ("gif" in output_file_name or gif_flag is True):
                     command = [
                         "ffmpeg",
                         "-i",
-                        f"output/{output_file_name}.mp4",
-                        f"output/{output_file_name}.gif",
+                        f"{output_folder_path}/{output_file_name}.mp4",
+                        f"{output_folder_path}/{output_file_name}.gif",
                         "-loglevel",
                         ffmpeg_loglevel,
                     ]
                     subprocess.run(command)
                     # Delete mp4 after creating gif file
-                    subprocess.run(["rm", f"output/{output_file_name}.mp4"])
+                    subprocess.run(
+                        ["rm", f"{output_folder_path}/{output_file_name}.mp4"]
+                    )
                     print(
                         f"Video Convert Success(mp4 to gif): output/{output_file_name}.gif"
                     )
     else:
         # Covert m3u8 to mp4
-        if not os.path.exists("output"):
-            os.makedirs("output")
+        if not os.path.exists(output_folder_path):
+            os.makedirs(output_folder_path)
         num = len(m3u8s)
         mp4_id = ""
         for index, input_file_name in enumerate(m3u8s):
@@ -644,9 +649,9 @@ def download_video_for_sc(tweet_url, output_file=""):
                 input_file_name,
                 "-c",
                 "copy",
-                f"output/{output_file_name}.mp4",
+                f"{output_folder_path}/{output_file_name}.mp4",
                 "-loglevel",
                 ffmpeg_loglevel,
             ]
             subprocess.run(command)
-            print(f"Video Output Success: output/{output_file_name}.mp4")
+            print(f"Video Output Success: {output_folder_path}/{output_file_name}.mp4")
