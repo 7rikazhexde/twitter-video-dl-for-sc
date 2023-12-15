@@ -4,10 +4,10 @@ description = "This project is based on the original code of the [inteoryx / twi
 license = "Unlicense"
 name = "twitter-video-dl-for-sc"
 readme = "README.md"
-version = "0.2.2"
+version = "0.2.3"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.11.0"
 requests = "^2.31.0"
 
 [tool.poetry.group.dev.dependencies]
