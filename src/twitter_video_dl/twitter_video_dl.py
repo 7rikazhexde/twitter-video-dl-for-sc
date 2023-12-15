@@ -202,7 +202,7 @@ def get_associated_media_id(j, tweet_url):
     pattern = (
         r'"expanded_url"\s*:\s*"https://x\.com/[^/]+/status/'
         + sid
-        + '/[^"]+",\s*"id_str"\s*:\s*"\d+",'
+        + r'/[^"]+",\s*"id_str"\s*:\s*"\d+",'
     )
     matches = re.findall(pattern, j)
     if len(matches) > 0:
@@ -505,8 +505,6 @@ def download_video(tweet_url, output_file, target_all_videos=False):
 def download_video_for_sc(tweet_url, output_file=""):
     """
     In cases where multiple videos are posted in a single tweet, each video will be saved.
-
-    In the case of videos posted in a threaded tweet, all videos posted in the thread will be saved.
     However, there are cases where videos cannot be saved depending on the content of the video or
     the settings at the time of posting.
     This is because the MP4 file information is not saved versus the URL.
@@ -514,84 +512,141 @@ def download_video_for_sc(tweet_url, output_file=""):
     bearer_token, guest_token = get_tokens(tweet_url)
     resp = get_tweet_details(tweet_url, guest_token, bearer_token)
     mp4_ids, mp4s, twvdlst = extract_mp4_fmp4(resp.text)
-    # Remove duplicates
-    if mp4_ids:
-        mp4_ids = list(set(mp4_ids))
-    if mp4s:
-        mp4s = list({v["url"]: v for v in mp4s}.values())
-    if twvdlst:
-        twvdlst = list(set(twvdlst))
+    m3u8s = list(set([mp4["url"] for mp4 in mp4s if "m3u8" in mp4["url"]]))
+    # print(f'mp4_ids: {mp4_ids}')
+    # print(f'mp4s: {mp4s}')
+    # print(f'twvdlst: {twvdlst}')
+    # print(f'm3u8s: {m3u8s}')
 
-    output_file_name = ""
-    video_url_list = []
-    num = 0
-    gif_flag = False
+    if not m3u8s:
+        # Get request
+        # Remove duplicates
+        if mp4_ids:
+            mp4_ids = list(set(mp4_ids))
+        if mp4s:
+            mp4s = list({v["url"]: v for v in mp4s}.values())
+        if twvdlst:
+            twvdlst = list(set(twvdlst))
 
-    # Parse URL
-    parsed_url = urllib.parse.urlparse(tweet_url)
-    # Split paths with '/'.
-    path_parts = parsed_url.path.split("/")
-    try:
-        # Get the next part of 'status'
-        mp4_id = path_parts[path_parts.index("status") + 1]
-    except ValueError:
-        # If 'status' is not present, set to default value
-        mp4_id = "output"
+        output_file_name = ""
+        video_url_list = []
+        num = 0
+        gif_flag = False
 
-    for mp4_id in mp4_ids:
-        max_resolution = 0
-        max_resolution_url = ""
-        for mp4 in mp4s:
-            if "resolution" in mp4 and str(mp4_id) in mp4["url"]:
-                resolution = mp4["resolution"]
-                width, height = resolution.split("x")
-                if int(width) * int(height) > max_resolution:
-                    max_resolution = int(width) * int(height)
-                    max_resolution_url = mp4["url"]
-        if max_resolution_url:
-            video_url_list.append(max_resolution_url)
-    if len(twvdlst) > 0:
-        for twvd in twvdlst:
-            video_url_list.append(twvd)
-        gif_flag = True
-    num = len(video_url_list)
-    for index, max_resolution_url in enumerate(video_url_list):
-        response = requests.get(max_resolution_url)
-        if response.status_code == 200:
-            if not os.path.exists("output"):
-                os.makedirs("output")
-            if "/ext_tw_video/" in max_resolution_url:
-                mp4_id = max_resolution_url.split("/ext_tw_video/")[-1].split("/")[0]
-            elif "/amplify_video/" in max_resolution_url:
-                mp4_id = max_resolution_url.split("/amplify_video/")[-1].split("/")[0]
+        # Parse URL
+        parsed_url = urllib.parse.urlparse(tweet_url)
+        # Split paths with '/'.
+        path_parts = parsed_url.path.split("/")
+        try:
+            # Get the next part of 'status'
+            mp4_id = path_parts[path_parts.index("status") + 1]
+        except ValueError:
+            # If 'status' is not present, set to default value
+            mp4_id = "output"
 
-            if "tweet_video" in max_resolution_url:
-                resolution = ""
-            elif "avc1" in max_resolution_url:
-                resolution = max_resolution_url.split("/avc1/")[-1].split("/")[0]
-            else:
-                resolution = max_resolution_url.split("/vid/")[-1].split("/")[0]
+        for mp4_id in mp4_ids:
+            max_resolution = 0
+            max_resolution_url = ""
+            for mp4 in mp4s:
+                if "resolution" in mp4 and str(mp4_id) in mp4["url"]:
+                    resolution = mp4["resolution"]
+                    width, height = resolution.split("x")
+                    if int(width) * int(height) > max_resolution:
+                        max_resolution = int(width) * int(height)
+                        max_resolution_url = mp4["url"]
+            if max_resolution_url:
+                video_url_list.append(max_resolution_url)
+        if len(twvdlst) > 0:
+            for twvd in twvdlst:
+                video_url_list.append(twvd)
+            gif_flag = True
+        num = len(video_url_list)
+        for index, max_resolution_url in enumerate(video_url_list):
+            # print(f'max_resolution_url:{max_resolution_url}')
+            response = requests.get(max_resolution_url)
+            if response.status_code == 200:
+                if not os.path.exists("output"):
+                    os.makedirs("output")
+                if "/ext_tw_video/" in max_resolution_url:
+                    mp4_id = max_resolution_url.split("/ext_tw_video/")[-1].split("/")[
+                        0
+                    ]
+                elif "/amplify_video/" in max_resolution_url:
+                    mp4_id = max_resolution_url.split("/amplify_video/")[-1].split("/")[
+                        0
+                    ]
+
+                if "tweet_video" in max_resolution_url:
+                    resolution = ""
+                elif "avc1" in max_resolution_url:
+                    resolution = max_resolution_url.split("/avc1/")[-1].split("/")[0]
+                else:
+                    resolution = max_resolution_url.split("/vid/")[-1].split("/")[0]
+
+                if output_file == "":
+                    if num > 1:
+                        output_file_name = f"{mp4_id}_{resolution}_{index+1}"
+                    else:
+                        output_file_name = f"{mp4_id}_{resolution}"
+                        if "tweet_video" in max_resolution_url:
+                            output_file_name = f"{mp4_id}{resolution}"
+                else:
+                    if num > 1:
+                        output_file_name = f"{output_file}_{index+1}"
+                    else:
+                        output_file_name = f"{output_file}"
+                # print(f'output_file_name: {output_file_name}')
+                # mp4 file output
+                with open(f"output/{output_file_name}.mp4", "wb") as f:
+                    f.write(response.content)
+                    print(f"Video Output Success: output/{output_file_name}.mp4")
+                # Covert mp4 to gif
+                if convert_gif_flag and ("gif" in output_file_name or gif_flag is True):
+                    command = [
+                        "ffmpeg",
+                        "-i",
+                        f"output/{output_file_name}.mp4",
+                        f"output/{output_file_name}.gif",
+                        "-loglevel",
+                        ffmpeg_loglevel,
+                    ]
+                    subprocess.run(command)
+                    # Delete mp4 after creating gif file
+                    subprocess.run(["rm", f"output/{output_file_name}.mp4"])
+                    print(
+                        f"Video Convert Success(mp4 to gif): output/{output_file_name}.gif"
+                    )
+    else:
+        # Covert m3u8 to mp4
+        if not os.path.exists("output"):
+            os.makedirs("output")
+        num = len(m3u8s)
+        mp4_id = ""
+        for index, input_file_name in enumerate(m3u8s):
+            if "/ext_tw_video/" in input_file_name:
+                mp4_id = input_file_name.split("/ext_tw_video/")[-1].split("/")[0]
+            elif "/amplify_video/" in input_file_name:
+                mp4_id = input_file_name.split("/amplify_video/")[-1].split("/")[0]
 
             if output_file == "":
                 if num > 1:
-                    output_file_name = f"{mp4_id}_{resolution}_{index+1}"
+                    output_file_name = f"{mp4_id}_{index+1}"
                 else:
-                    output_file_name = f"{mp4_id}_{resolution}"
-                    if "tweet_video" in max_resolution_url:
-                        output_file_name = f"{mp4_id}{resolution}"
+                    output_file_name = f"{mp4_id}"
             else:
                 if num > 1:
                     output_file_name = f"{output_file}_{index+1}"
                 else:
                     output_file_name = f"{output_file}"
-            # mp4 file output
-            with open(f"output/{output_file_name}.mp4", "wb") as f:
-                f.write(response.content)
-                print(f"Video Output Success: output/{output_file_name}.mp4")
-            # Covert mp4 to gif
-            if convert_gif_flag and ("gif" in output_file_name or gif_flag is True):
-                command = f"ffmpeg -i output/{output_file_name}.mp4 output/{output_file_name}.gif -loglevel {ffmpeg_loglevel} && rm output/{output_file_name}.mp4"
-                subprocess.run(command, shell=True)
-                print(
-                    f"Video Convert Success(mp4 to gif): output/{output_file_name}.gif"
-                )
+            command = [
+                "ffmpeg",
+                "-i",
+                input_file_name,
+                "-c",
+                "copy",
+                f"output/{output_file_name}.mp4",
+                "-loglevel",
+                ffmpeg_loglevel,
+            ]
+            subprocess.run(command)
+            print(f"Video Output Success: output/{output_file_name}.mp4")
