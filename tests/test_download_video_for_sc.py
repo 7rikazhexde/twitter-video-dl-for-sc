@@ -3,10 +3,33 @@ import shutil
 
 import ffmpeg
 import pytest
+from tomlkit.toml_file import TOMLFile
 
 from src.twitter_video_dl.twitter_video_dl import download_video_for_sc
 
 OUTPUT_FOLDER_PATH = "./tests/output"
+
+
+def test_download_videos():
+    """Forking source test case-based test function"""
+    # Get TOML file
+    toml = TOMLFile("./tests/TestVideos.toml")
+    toml_data = toml.read()
+    toml_get_data = toml_data.get("videos")
+
+    # Get the "url" and "audio_check_flag" of each element to see if the video can be retrieved and saved correctly
+    for video in toml_get_data:
+        url = video.get("url")
+        acf = video.get("audio_check_flag")
+        download_video_for_sc(url, "test", output_folder_path=OUTPUT_FOLDER_PATH)
+        if acf:
+            print(f"audio_check_flag: {acf}, url: {url}")
+            check_video(f"{OUTPUT_FOLDER_PATH}/test.mp4", audio_check_flag=acf)
+            os.remove(f"{OUTPUT_FOLDER_PATH}/test.mp4")
+        else:
+            print(f"audio_check_flag: {acf}, url: {url}")
+            check_video(f"{OUTPUT_FOLDER_PATH}/test.gif", audio_check_flag=acf)
+            os.remove(f"{OUTPUT_FOLDER_PATH}/test.gif")
 
 
 def test_download_video4_success():
