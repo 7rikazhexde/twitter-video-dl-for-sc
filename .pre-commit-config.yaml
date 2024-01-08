@@ -4,7 +4,7 @@ fail_fast: true
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     # Specify version or tag to use (as of 23.5.31)
-    rev: v4.4.0
+    rev: v4.5.0
     hooks:
       # Remove spaces at end of lines except markdown
       - id: trailing-whitespace
@@ -22,7 +22,7 @@ repos:
   # https://python-poetry.org/docs/pre-commit-hooks/#usage
   - repo: https://github.com/python-poetry/poetry
     # Cannot be executed with local designation (as of 23.10.8)
-    rev: 1.6.1
+    rev: 1.7.1
     hooks:
       - id: poetry-check
         verbose: true
@@ -41,14 +41,14 @@ repos:
   # Repository local hooks
   - repo: local
     hooks:
-    -   id: black
+      - id: black
         name: black
         stages: [commit]
         language: system
         entry: poetry run task blackfix
         types: [python]
 
-    -   id: ruff
+      - id: ruff
         name: ruff
         stages: [commit]
         language: system
