@@ -38,19 +38,9 @@ repos:
         verbose: true
         files: ^pyproject\.toml$
 
-  # Repository local hooks
-  - repo: local
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.2.0
     hooks:
-      - id: black
-        name: black
-        stages: [commit]
-        language: system
-        entry: poetry run task blackfix
-        types: [python]
-
       - id: ruff
-        name: ruff
-        stages: [commit]
-        language: system
-        entry: poetry run task rufffix
-        types: [python]
+        args: [ --fix ]
+      - id: ruff-format

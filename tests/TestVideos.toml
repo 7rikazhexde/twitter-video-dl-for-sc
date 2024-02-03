@@ -4,46 +4,57 @@ title = "Test file(TOML) for twitter-video-dl-for-sc"
 # Create a video table and fill in "url" and "audio_check_flag" as a set.
 # Specify false for ".gif" and true for ".mp4".
 
+# non card type
 [[videos]]
 url = "https://twitter.com/gujarat_titans/status/1655207515162832897"
 audio_check_flag = false
 
+# card type
 [[videos]]
 url = "https://twitter.com/GOTGTheGame/status/1451361961782906889"
 audio_check_flag = true
 
+# non card type
 [[videos]]
 url = "https://twitter.com/james_a_rob/status/1451958941886435329"
 audio_check_flag = true
 
+# non card type
 [[videos]]
 url = "https://twitter.com/iamdariusalford/status/1452487813572829185"
 audio_check_flag = true
 
+# non card type
 [[videos]]
 url = "https://twitter.com/Queen__Deshda/status/1452467693517426697"
 audio_check_flag = true
 
+# non card type
 [[videos]]
 url = "https://twitter.com/jackposobiec/status/1644904637810573312?s=46&t=C4RATVnzrLTKmtxPwRNPQQ"
 audio_check_flag = true
 
+# non card type
 [[videos]]
 url = "https://twitter.com/Ballislife/status/1452473447053922305"
 audio_check_flag = true
 
+# non card type
 [[videos]]
 url = "https://twitter.com/YahooSports/status/1452467898358718471"
 audio_check_flag = true
 
+# non card type
 [[videos]]
 url = "https://twitter.com/BleacherReport/status/1452444953435533312"
 audio_check_flag = true
 
+# non card type
 [[videos]]
 url = "https://twitter.com/lilteish/status/1094410530335481856"
 audio_check_flag = true
 
-[[videos]]
-url = "https://twitter.com/nocontexthumans/status/1641810447358631938"
-audio_check_flag = true
+# Deleted post
+#[[videos]]
+#url = "https://twitter.com/nocontexthumans/status/1641810447358631938"
+#audio_check_flag = true

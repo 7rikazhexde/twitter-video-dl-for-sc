@@ -2,6 +2,7 @@
 Tests for the module.  Tests require ffmpeg to be installed.
 ffmpeg is not listed as a dependency in the setup.py file because it is only required for the tests.
 """
+
 import os
 import sys
 
