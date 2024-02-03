@@ -112,7 +112,6 @@ def get_details_url(tweet_id, features, variables):
     variables["tweetId"] = tweet_id
 
     return f"https://twitter.com/i/api/graphql/0hWvDhmW8YQ-S_ib3azIrw/TweetResultByRestId?variables={urllib.parse.quote(json.dumps(variables))}&features={urllib.parse.quote(json.dumps(features))}"
-    # return f"https://api.twitter.com/graphql/ncDeACNGIApPMaqGVuF_rw/TweetResultByRestId?variables={urllib.parse.quote(json.dumps(variables))}&features={urllib.parse.quote(json.dumps(features))}"
 
 
 def get_tweet_details(tweet_url, guest_token, bearer_token):
@@ -141,9 +140,7 @@ def get_tweet_details(tweet_url, guest_token, bearer_token):
         try:
             error_json = json.loads(details.text)
         except json.JSONDecodeError:
-            assert (
-                False
-            ), f"Failed to parse json from details error. details text: {details.text}  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Status code: {details.status_code}.  Tweet url: {tweet_url}"
+            assert False, f"Failed to parse json from details error. details text: {details.text}  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Status code: {details.status_code}.  Tweet url: {tweet_url}"
 
         assert (
             "errors" in error_json
@@ -192,7 +189,7 @@ def get_tweet_details(tweet_url, guest_token, bearer_token):
 
 
 def get_tweet_status_id(tweet_url):
-    sid_patern = r"https://x\.com/[^/]+/status/(\d+)"
+    sid_patern = r"https://(?:x\.com|twitter\.com)/[^/]+/status/(\d+)"
     if tweet_url[len(tweet_url) - 1] != "/":
         tweet_url = tweet_url + "/"
 
@@ -207,7 +204,7 @@ def get_tweet_status_id(tweet_url):
 def get_associated_media_id(j, tweet_url):
     sid = get_tweet_status_id(tweet_url)
     pattern = (
-        r'"expanded_url"\s*:\s*"https://x\.com/[^/]+/status/'
+        r'"expanded_url"\s*:\s*"https://(?:x\.com|twitter\.com)/[^/]+/status/'
         + sid
         + r'/[^"]+",\s*"id_str"\s*:\s*"\d+",'
     )
@@ -280,51 +277,6 @@ def extract_mp4s(j, tweet_url, target_all_mp4s=False):
         return urls
 
     return [x["url"] for x in results.values()]
-
-
-def extract_mp4_fmp4(j):
-    """
-    Extract the URL of the MP4 video from the detailed information of the tweet.
-    Returns a list of URLs, tweet IDs, and resolution information (dictionary type)
-    and a list of tweet IDs as return values.
-    """
-
-    # Empty list to store tweet IDs
-    tweet_id_list = []
-    # List of dictionaries containing information about MP4 videos extracted from tweets
-    mp4_info_dict_list = []
-    # List of URLs pointing to MP4 video files extracted from tweets
-    tweet_video_url_list = []
-
-    # pattern looks like https://video.twimg.com/amplify_video/1638969830442237953/vid/1080x1920/lXSFa54mAVp7KHim.mp4?tag=16 or https://video.twimg.com/ext_tw_video/1451958820348080133/pu/vid/720x1280/GddnMJ7KszCQQFvA.mp4?tag=12
-    amplitude_pattern = re.compile(
-        r"(https://video.twimg.com/amplify_video/(\d+)/vid/(avc1/)(\d+x\d+)/[^.]+.mp4\?tag=\d+)"
-    )
-    ext_tw_pattern = re.compile(
-        r"(https://video.twimg.com/ext_tw_video/(\d+)/pu/vid/(avc1/)?(\d+x\d+)/[^.]+.mp4\?tag=\d+)"
-    )
-    tweet_video_pattern = re.compile(r'https://video.twimg.com/tweet_video/[^"]+')
-    # https://video.twimg.com/ext_tw_video/1451958820348080133/pu/pl/b-CiC-gZClIwXgDz.m3u8?tag=12&container=fmp4
-    container_pattern = re.compile(r'https://video.twimg.com/[^"]*container=fmp4')
-
-    # find all the matches
-    matches = amplitude_pattern.findall(j)
-    matches += ext_tw_pattern.findall(j)
-    container_matches = container_pattern.findall(j)
-    tweet_video_url_list = tweet_video_pattern.findall(j)
-
-    for match in matches:
-        url, tweet_id, _, resolution = match
-        tweet_id_list.append(int(tweet_id))
-        mp4_info_dict_list.append({"resolution": resolution, "url": url})
-
-    tweet_id_list = list(dict.fromkeys(tweet_id_list))
-
-    if len(container_matches) > 0:
-        for url in container_matches:
-            mp4_info_dict_list.append({"url": url})
-
-    return tweet_id_list, mp4_info_dict_list, tweet_video_url_list
 
 
 def download_parts(url, output_filename):
@@ -416,7 +368,9 @@ def repost_check(j, exclude_replies=True):
         ssid = json.loads("{" + matches[0] + "}")["source_status_id_str"]
         # We plug it in this regular expression to find expanded_url (the original tweet url)
         expanded_url_pattern = (
-            r'"expanded_url"\s*:\s*"https://x\.com/[^/]+/status/' + ssid + '[^"]+"'
+            r'"expanded_url"\s*:\s*"https://(?:x\.com|twitter\.com)/[^/]+/status/'
+            + ssid
+            + '[^"]+"'
         )
         matches2 = re.findall(expanded_url_pattern, j)
 
@@ -435,7 +389,7 @@ def repost_check(j, exclude_replies=True):
         if len(ssids) > 0:
             for ssid in ssids:
                 expanded_url_pattern = (
-                    r'"expanded_url"\s*:\s*"https://x\.com/[^/]+/status/'
+                    r'"expanded_url"\s*:\s*"https://(?:x\.com|twitter\.com)/[^/]+/status/'
                     + ssid
                     + '[^"]+"'
                 )
@@ -509,149 +463,164 @@ def download_video(tweet_url, output_file, target_all_videos=False):
                             f.flush()
 
 
+def create_video_urls(json_data):
+    data = json.loads(json_data)
+    gif_ptn = False
+    media_list = None
+
+    try:
+        media_list = data["data"]["tweetResult"]["result"]["card"]["legacy"][
+            "binding_values"
+        ]
+    except KeyError:
+        pass
+
+    if media_list is None:
+        # print("non cardtype")
+        try:
+            media_list = data["data"]["tweetResult"]["result"]["legacy"][
+                "extended_entities"
+            ]["media"]
+        except KeyError:
+            pass
+
+    if media_list:
+        if "video_info" in media_list[0]:
+            video_url_list, gif_ptn = get_non_card_type_vid_urls(media_list)
+        else:
+            video_url_list = get_card_type_vid_url(media_list)
+    else:
+        video_url_list = []
+
+    return video_url_list, gif_ptn
+
+
+def get_card_type_vid_url(data):
+    highest_resolution_url = None
+    highest_resolution_bitrate = 0
+    video_url_list = []
+
+    for item in data:
+        value = item.get("value")
+        if value and value.get("string_value"):
+            string_value = value["string_value"]
+            try:
+                json_value = json.loads(string_value)
+                media_entities = json_value.get("media_entities")
+                if media_entities:
+                    for media_key, media_info in media_entities.items():
+                        video_info = media_info.get("video_info")
+                        if video_info:
+                            variants = video_info.get("variants")
+                            if variants:
+                                for variant in variants:
+                                    content_type = variant.get("content_type")
+                                    if content_type == "video/mp4":
+                                        bitrate = variant.get("bitrate", 0)
+                                        if bitrate > highest_resolution_bitrate:
+                                            highest_resolution_bitrate = bitrate
+                                            highest_resolution_url = variant["url"]
+            except json.JSONDecodeError:
+                continue
+
+    if highest_resolution_url:
+        video_url_list.append(highest_resolution_url)
+
+    return video_url_list
+
+
+def get_non_card_type_vid_urls(media_list):
+    video_url_list = []
+    gif_ptn = False
+
+    if media_list:
+        for media_item in media_list:
+            video_info = media_item.get("video_info")
+            if not video_info:
+                continue
+
+            variants = video_info.get("variants")
+            if not variants:
+                continue
+
+            video_url = None
+            max_bitrate = 0
+
+            for variant in variants:
+                if variant.get("bitrate") and variant["bitrate"] > max_bitrate:
+                    max_bitrate = variant["bitrate"]
+                    video_url = variant["url"]
+                elif variant.get("bitrate") == 0:  # gif case
+                    video_url = variant["url"]
+                    gif_ptn = True
+
+            if video_url:
+                video_url_list.append(video_url)
+    return video_url_list, gif_ptn
+
+
+def download_videos(video_urls, output_file, output_folder_path, gif_ptn):
+    os.makedirs(output_folder_path, exist_ok=True)
+    num = len(video_urls)
+
+    for i, video_url in enumerate(video_urls, start=1):
+        if output_file == "":
+            if num > 1:
+                filename = f"{output_folder_path}/output_{i}"
+            else:
+                filename = f"{output_folder_path}/output"
+        else:
+            if num > 1:
+                filename = f"{output_folder_path}/{output_file}_{i}"
+            else:
+                filename = f"{output_folder_path}/{output_file}"
+
+        # Ask the user if the file should be overwritten if it exists
+        output_file_name = f"{filename}.mp4"
+        if os.path.exists(output_file_name):
+            while True:
+                response = (
+                    input(
+                        f"The file '{output_file_name}' already exists. Do you want to overwrite it? (y/n): "
+                    )
+                    .strip()
+                    .lower()
+                )
+                if response == "y":
+                    break
+                elif response == "n":
+                    print("Exit the program.")
+                    return
+                else:
+                    print("Invalid input. Please enter 'y' or 'n'.")
+
+        with requests.get(video_url, stream=True) as response:
+            with open(output_file_name, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                print(f"Video {output_file_name} downloaded successfully.")
+
+        if gif_ptn:
+            # Covert mp4 to gif
+            if convert_gif_flag:
+                command = [
+                    "ffmpeg",
+                    "-i",
+                    f"{filename}.mp4",
+                    f"{filename}.gif",
+                    "-loglevel",
+                    ffmpeg_loglevel,
+                ]
+                subprocess.run(command)
+                # Delete mp4 after creating gif file
+                subprocess.run(["rm", f"{filename}.mp4"])
+                print(f"Video Convert Success(mp4 to gif): {filename}.gif")
+    print("All videos downloaded successfully.")
+
+
 def download_video_for_sc(tweet_url, output_file="", output_folder_path="./output"):
-    """
-    In cases where multiple videos are posted in a single tweet, each video will be saved.
-    However, there are cases where videos cannot be saved depending on the content of the video or
-    the settings at the time of posting.
-    This is because the MP4 file information is not saved versus the URL.
-    """
     bearer_token, guest_token = get_tokens(tweet_url)
     resp = get_tweet_details(tweet_url, guest_token, bearer_token)
-    mp4_ids, mp4s, twvdlst = extract_mp4_fmp4(resp.text)
-    m3u8s = list(set([mp4["url"] for mp4 in mp4s if "m3u8" in mp4["url"]]))
-
-    if not m3u8s:
-        # Get request
-        # Remove duplicates
-        if mp4_ids:
-            mp4_ids = list(set(mp4_ids))
-        if mp4s:
-            mp4s = list({v["url"]: v for v in mp4s}.values())
-        if twvdlst:
-            twvdlst = list(set(twvdlst))
-
-        output_file_name = ""
-        video_url_list = []
-        num = 0
-        gif_flag = False
-
-        # Parse URL
-        parsed_url = urllib.parse.urlparse(tweet_url)
-        # Split paths with '/'.
-        path_parts = parsed_url.path.split("/")
-        try:
-            # Get the next part of 'status'
-            mp4_id = path_parts[path_parts.index("status") + 1]
-        except ValueError:
-            # If 'status' is not present, set to default value
-            mp4_id = "output"
-
-        for mp4_id in mp4_ids:
-            max_resolution = 0
-            max_resolution_url = ""
-            for mp4 in mp4s:
-                if "resolution" in mp4 and str(mp4_id) in mp4["url"]:
-                    resolution = mp4["resolution"]
-                    width, height = resolution.split("x")
-                    if int(width) * int(height) > max_resolution:
-                        max_resolution = int(width) * int(height)
-                        max_resolution_url = mp4["url"]
-            if max_resolution_url:
-                video_url_list.append(max_resolution_url)
-        if len(twvdlst) > 0:
-            for twvd in twvdlst:
-                video_url_list.append(twvd)
-            gif_flag = True
-        num = len(video_url_list)
-        for index, max_resolution_url in enumerate(video_url_list):
-            response = requests.get(max_resolution_url)
-            if response.status_code == 200:
-                if not os.path.exists(output_folder_path):
-                    os.makedirs(output_folder_path)
-                if "/ext_tw_video/" in max_resolution_url:
-                    mp4_id = max_resolution_url.split("/ext_tw_video/")[-1].split("/")[
-                        0
-                    ]
-                elif "/amplify_video/" in max_resolution_url:
-                    mp4_id = max_resolution_url.split("/amplify_video/")[-1].split("/")[
-                        0
-                    ]
-
-                if "tweet_video" in max_resolution_url:
-                    resolution = ""
-                elif "avc1" in max_resolution_url:
-                    resolution = max_resolution_url.split("/avc1/")[-1].split("/")[0]
-                else:
-                    resolution = max_resolution_url.split("/vid/")[-1].split("/")[0]
-
-                if output_file == "":
-                    if num > 1:
-                        output_file_name = f"{mp4_id}_{resolution}_{index+1}"
-                    else:
-                        output_file_name = f"{mp4_id}_{resolution}"
-                        if "tweet_video" in max_resolution_url:
-                            output_file_name = f"{mp4_id}{resolution}"
-                else:
-                    if num > 1:
-                        output_file_name = f"{output_file}_{index+1}"
-                    else:
-                        output_file_name = f"{output_file}"
-                # mp4 file output
-                with open(f"{output_folder_path}/{output_file_name}.mp4", "wb") as f:
-                    f.write(response.content)
-                    print(
-                        f"Video Output Success: {output_folder_path}/{output_file_name}.mp4"
-                    )
-                # Covert mp4 to gif
-                if convert_gif_flag and ("gif" in output_file_name or gif_flag is True):
-                    command = [
-                        "ffmpeg",
-                        "-i",
-                        f"{output_folder_path}/{output_file_name}.mp4",
-                        f"{output_folder_path}/{output_file_name}.gif",
-                        "-loglevel",
-                        ffmpeg_loglevel,
-                    ]
-                    subprocess.run(command)
-                    # Delete mp4 after creating gif file
-                    subprocess.run(
-                        ["rm", f"{output_folder_path}/{output_file_name}.mp4"]
-                    )
-                    print(
-                        f"Video Convert Success(mp4 to gif): output/{output_file_name}.gif"
-                    )
-    else:
-        # Covert m3u8 to mp4
-        if not os.path.exists(output_folder_path):
-            os.makedirs(output_folder_path)
-        num = len(m3u8s)
-        mp4_id = ""
-        for index, input_file_name in enumerate(m3u8s):
-            if "/ext_tw_video/" in input_file_name:
-                mp4_id = input_file_name.split("/ext_tw_video/")[-1].split("/")[0]
-            elif "/amplify_video/" in input_file_name:
-                mp4_id = input_file_name.split("/amplify_video/")[-1].split("/")[0]
-
-            if output_file == "":
-                if num > 1:
-                    output_file_name = f"{mp4_id}_{index+1}"
-                else:
-                    output_file_name = f"{mp4_id}"
-            else:
-                if num > 1:
-                    output_file_name = f"{output_file}_{index+1}"
-                else:
-                    output_file_name = f"{output_file}"
-            command = [
-                "ffmpeg",
-                "-i",
-                input_file_name,
-                "-c",
-                "copy",
-                f"{output_folder_path}/{output_file_name}.mp4",
-                "-loglevel",
-                ffmpeg_loglevel,
-            ]
-            subprocess.run(command)
-            print(f"Video Output Success: {output_folder_path}/{output_file_name}.mp4")
+    video_urls, gif_ptn = create_video_urls(resp.text)
+    download_videos(video_urls, output_file, output_folder_path, gif_ptn)

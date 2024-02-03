@@ -53,7 +53,7 @@ def test_download_video_non_filename_success():
     """Test function for the case where one video file is submitted in one post (no output file name specified)"""
     url = "https://x.com/tw_7rikazhexde/status/1710868951109124552?s=20"
     download_video_for_sc(url, "", output_folder_path=OUTPUT_FOLDER_PATH)
-    check_video(f"{OUTPUT_FOLDER_PATH}/1710868926161399808.mp4", audio_check_flag=True)
+    check_video(f"{OUTPUT_FOLDER_PATH}/output.mp4", audio_check_flag=True)
 
 
 def test_download_video_failure():
@@ -71,7 +71,7 @@ def test_download_gif_filename():
     """Test function for cases where a gif file is submitted (with output file name specified)"""
     url = "https://x.com/tw_7rikazhexde/status/1735502484700057703?s=20"
     download_video_for_sc(url, "", output_folder_path=OUTPUT_FOLDER_PATH)
-    check_video(f"{OUTPUT_FOLDER_PATH}/1735502484700057703.gif")
+    check_video(f"{OUTPUT_FOLDER_PATH}/output.gif")
 
 
 def test_download_gif_non_filename():
