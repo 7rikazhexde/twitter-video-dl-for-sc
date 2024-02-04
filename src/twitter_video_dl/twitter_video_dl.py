@@ -475,6 +475,13 @@ def create_video_urls(json_data):
     except KeyError:
         pass
 
+    try:
+        media_list = data["data"]["tweetResult"]["result"]["legacy"]["entities"][
+            "media"
+        ]
+    except KeyError:
+        pass
+
     if media_list is None:
         # print("non cardtype")
         try:
@@ -484,9 +491,15 @@ def create_video_urls(json_data):
         except KeyError:
             pass
 
+    print(media_list)
+
     if media_list:
         if "video_info" in media_list[0]:
-            video_url_list, gif_ptn = get_non_card_type_vid_urls(media_list)
+            video_url_list, gif_ptn = get_non_card_type_extended_entities_vid_urls(
+                media_list
+            )
+        elif media_list[0].get("type") == "photo":
+            video_url_list, gif_ptn = get_non_card_type_entities_vid_urls(media_list)
         else:
             video_url_list = get_card_type_vid_url(media_list)
     else:
@@ -529,7 +542,37 @@ def get_card_type_vid_url(data):
     return video_url_list
 
 
-def get_non_card_type_vid_urls(media_list):
+def get_non_card_type_entities_vid_urls(media_list):
+    video_url_list = []
+    gif_ptn = False
+
+    if media_list:
+        for media_item in media_list:
+            video_info = media_item.get("video_info")
+            if not video_info:
+                continue
+
+            variants = video_info.get("variants")
+            if not variants:
+                continue
+
+            video_url = None
+            max_bitrate = 0
+
+            for variant in variants:
+                if variant.get("bitrate") and variant["bitrate"] > max_bitrate:
+                    max_bitrate = variant["bitrate"]
+                    video_url = variant["url"]
+                elif variant.get("bitrate") == 0:  # gif case
+                    video_url = variant["url"]
+                    gif_ptn = True
+
+            if video_url:
+                video_url_list.append(video_url)
+    return video_url_list, gif_ptn
+
+
+def get_non_card_type_extended_entities_vid_urls(media_list):
     video_url_list = []
     gif_ptn = False
 
