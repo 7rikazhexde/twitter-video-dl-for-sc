@@ -7,11 +7,13 @@ This project is based on the original code of the [inteoryx / twitter-video-dl](
 - [twitter-video-dl-for-sc](#twitter-video-dl-for-sc)
   - [ToC](#toc)
   - [Demo (Shortcuts)](#demo-shortcuts)
-  - [Demo (Shortcuts for Mac browser)](#demo-shortcuts-for-mac-browser)
+  - [Demo (Shortcuts for Mac Browser)](#demo-shortcuts-for-mac-browser)
+  - [Demo (Browser Extension)](#demo-browser-extension)
   - [Usage](#usage)
     - [Installing FFmpeg](#installing-ffmpeg)
     - [For Shortcuts](#for-shortcuts)
   - [For Mac Browser](#for-mac-browser)
+  - [For Browser Extension](#for-browser-extension)
   - [CLI For Windows / Mac / Linux](#cli-for-windows--mac--linux)
   - [Auto Retry Feature](#auto-retry-feature)
   - [Other](#other)
@@ -23,11 +25,15 @@ This project is based on the original code of the [inteoryx / twitter-video-dl](
 |One video per post|Mixing images and videos in one post|Mixing images and videos in a thread|
 |:---:|:---:|:---:|
 |<img src="./demo/demo1_v1_30fps_400x866.gif" width="80%" alt="One video per post">|<img src="./demo/demo2_v1_30fps_400x866.gif" width="80%" alt="Mixing images and videos in one post">|<img src="./demo/demo3_v2_30fps_400x866.gif" width="80%" alt="Mixing images and videos in a thread">|
-|[Original Post Link(Media)](https://twitter.com/i/status/1650829030609022981)|[Original Post Link(Media)](https://twitter.com/tw_7rikazhexde/status/1650808610157662211?s=20)|[Original post Link(Media)](https://twitter.com/tw_7rikazhexde/status/1650812768138981376?s=20)|
+|[Original Post Link(Media)](https://x.com/tw_7rikazhexde/status/1650804112987136000?s=20)|[Original Post Link(Media)](https://twitter.com/tw_7rikazhexde/status/1650808610157662211?s=20)|[Original Post Link(Media)](https://twitter.com/tw_7rikazhexde/status/1650812768138981376?s=20)|
 
-## Demo (Shortcuts for Mac browser)
+## Demo (Shortcuts for Mac Browser)
 
 <img src="./demo/demo1_twitter-video-dl-sc-for-mac_60fps_1440x900.gif" alt="twitter-video-dl-sc-for-mac demo">
+
+## Demo (Browser Extension)
+
+<img src="./demo/demo1_twitter-video-dl-sc-for-server_60fps_1280x720.gif" alt="twitter-video-dl-sc-for-server demo">
 
 ## Usage
 
@@ -81,6 +87,21 @@ Only differences from the procedure for iPhone and iPad are described.
    - twitter-video-dl-sc-for-mac-browser ([iCloud Link](https://www.icloud.com/shortcuts/bfbf5cd42dbe40cba7ed60f066be850d))
 
 2. When executing the shortcut, start **the video-posted post in the browser** that you start on your Mac, and then execute ***twitter-video-dl-sc-for-mac-browser*** from the tab Sharing. If it saves successfully, the destination will be displayed. ([See demo video](#demo-shortcuts-for-mac-browser))
+
+## For Browser Extension
+
+> [!WARNING]
+> **Browsers that have been tested are chrome and brave.**
+
+> [!NOTE]
+> **Please check [See demo video](#demo-browser-extension)**
+
+1. extensions > load unpackaged extensions > Local Package
+   **[twitter-video-dl-send](./browser_extension/twitter-video-dl-send/)**
+2. Start the server (`poetry run python twitter-video-dl-server.py`)
+3. Open the X(Twitter) web page where the video was posted.
+4. Specify the filename and URL (not required) in the extension and run the process of saving the video
+5. If there are no errors, the video will be saved in the **output** folder
 
 ## CLI For Windows / Mac / Linux
 
