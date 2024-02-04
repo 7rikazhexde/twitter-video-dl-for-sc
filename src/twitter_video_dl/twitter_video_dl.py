@@ -491,8 +491,6 @@ def create_video_urls(json_data):
         except KeyError:
             pass
 
-    print(media_list)
-
     if media_list:
         if "video_info" in media_list[0]:
             video_url_list, gif_ptn = get_non_card_type_extended_entities_vid_urls(
@@ -638,11 +636,19 @@ def download_videos(video_urls, output_file, output_folder_path, gif_ptn):
                     print("Invalid input. Please enter 'y' or 'n'.")
 
         with requests.get(video_url, stream=True) as response:
-            with open(output_file_name, "wb") as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
-                print(f"Video {output_file_name} downloaded successfully.")
+            if response.status_code == 200:
+                with open(output_file_name, "wb") as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                    print(f"Video {output_file_name} downloaded successfully.")
+            else:
+                print(
+                    f"Failed to download video from {video_url}. Status code: {response.status_code}"
+                )
+                print(
+                    f"If you are using the correct Twitter URL this suggests a bug in the script. Please open a GitHub issue and copy and paste this message. Tweet url: {video_url}"
+                )
 
         if gif_ptn:
             # Covert mp4 to gif

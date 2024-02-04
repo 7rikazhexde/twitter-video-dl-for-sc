@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            width: 450px;
+        }
+        #fileNameInput, #urlInput, #languageSelect {
+            width: 100%;
+            padding: 12px 20px;
+            margin: 8px 0;
+            box-sizing: border-box;
+        }
+        #sendCurrentUrl, #sendInputUrl {
+            background-color: #2a4fc9;
+            color: white;
+            padding: 14px 20px;
+            margin: 8px 0;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            width: 100%;
+        }
+        #sendCurrentUrl:hover, #sendInputUrl:hover {
+            background-color: #2a4fc9;
+        }
+    </style>
+</head>
+<body>
+    <h1 id="title"></h1>
+    <select id="languageSelect">
+        <option value="en">English</option>
+        <option value="ja">日本語</option>
+    </select>
+    <input type="text" id="fileNameInput" placeholder="">
+    <button id="sendCurrentUrl"></button>
+    <input type="text" id="urlInput" placeholder="">
+    <button id="sendInputUrl"></button>
+    <script src="popup.js"></script>
+</body>
+</html>
