@@ -11,7 +11,8 @@ OUTPUT_FOLDER_PATH = "./tests/output"
 
 
 def test_download_videos():
-    """Forking source test case-based test function"""
+    # Forking source test case-based test function
+
     # Get TOML file
     toml = TOMLFile("./tests/TestVideos.toml")
     toml_data = toml.read()
@@ -33,7 +34,7 @@ def test_download_videos():
 
 
 def test_download_video4_success():
-    """Test function for the case where multiple video files are submitted in one post"""
+    # Test function for the case where multiple video files are submitted in one post
     url = "https://x.com/tw_7rikazhexde/status/1710678217575801015?s=20"
     download_video_for_sc(url, "test", output_folder_path=OUTPUT_FOLDER_PATH)
     check_video(f"{OUTPUT_FOLDER_PATH}/test_1.mp4", audio_check_flag=True)
@@ -43,21 +44,21 @@ def test_download_video4_success():
 
 
 def test_download_video1_success():
-    """Test function for the case where one video file is submitted in one post (with output file name specified)"""
+    # Test function for the case where one video file is submitted in one post (with output file name specified)
     url = "https://x.com/tw_7rikazhexde/status/1710868951109124552?s=20"
     download_video_for_sc(url, "test", output_folder_path=OUTPUT_FOLDER_PATH)
     check_video(f"{OUTPUT_FOLDER_PATH}/test.mp4", audio_check_flag=True)
 
 
 def test_download_video_non_filename_success():
-    """Test function for the case where one video file is submitted in one post (no output file name specified)"""
+    # Test function for the case where one video file is submitted in one post (no output file name specified)
     url = "https://x.com/tw_7rikazhexde/status/1710868951109124552?s=20"
     download_video_for_sc(url, "", output_folder_path=OUTPUT_FOLDER_PATH)
     check_video(f"{OUTPUT_FOLDER_PATH}/output.mp4", audio_check_flag=True)
 
 
 def test_download_video_failure():
-    """Test function for cases where URL is not appropriate"""
+    # Test function for cases where URL is not appropriate
     url = "https://x.com/tw_7rikazhexde/status/hogehoge"
     with pytest.raises(AssertionError) as e_info:
         download_video_for_sc(url, "", output_folder_path=OUTPUT_FOLDER_PATH)
@@ -68,35 +69,45 @@ def test_download_video_failure():
 
 
 def test_download_gif_filename():
-    """Test function for cases where a gif file is submitted (with output file name specified)"""
+    # Test function for cases where a gif file is submitted (with output file name specified)
     url = "https://x.com/tw_7rikazhexde/status/1735502484700057703?s=20"
     download_video_for_sc(url, "", output_folder_path=OUTPUT_FOLDER_PATH)
     check_video(f"{OUTPUT_FOLDER_PATH}/output.gif")
 
 
 def test_download_gif_non_filename():
-    """Test function for cases where a gif file is submitted (without specifying the output filename)"""
+    # Test function for cases where a gif file is submitted (without specifying the output filename)
     url = "https://x.com/tw_7rikazhexde/status/1735503057079951364?s=20"
     download_video_for_sc(url, "gif_test", output_folder_path=OUTPUT_FOLDER_PATH)
     check_video(f"{OUTPUT_FOLDER_PATH}/gif_test.gif")
 
 
 def test_download_video1_non_avc1_success():
-    """Test function for cases where videos not supporting AVC1 encoding are submitted"""
+    # Test function for cases where videos not supporting AVC1 encoding are submitted
     url = "https://x.com/tw_7rikazhexde/status/1650804112987136000?s=20"
     download_video_for_sc(url, "test", output_folder_path=OUTPUT_FOLDER_PATH)
     check_video(f"{OUTPUT_FOLDER_PATH}/test.mp4", audio_check_flag=True)
 
 
 def test_download_video1_avc1_success():
-    """Test function for the case where a video is submitted that supports AVC1 encoding"""
+    # Test function for the case where a video is submitted that supports AVC1 encoding
     url = "https://x.com/tw_7rikazhexde/status/1710868951109124552?s=20"
     download_video_for_sc(url, "test", output_folder_path=OUTPUT_FOLDER_PATH)
     check_video(f"{OUTPUT_FOLDER_PATH}/test.mp4", audio_check_flag=True)
 
 
+def test_download_video2_success_non_card_type_entities():
+    # Test function for a case where an image and a video are posted in one post
+    # Type: non_card_type_entities
+    # Filename: specified
+    url = "https://twitter.com/tw_7rikazhexde/status/1703315760767197365?s=20"
+    download_video_for_sc(url, "test", output_folder_path=OUTPUT_FOLDER_PATH)
+    check_video(f"{OUTPUT_FOLDER_PATH}/test_1.mp4", audio_check_flag=True)
+    check_video(f"{OUTPUT_FOLDER_PATH}/test_2.mp4", audio_check_flag=True)
+
+
 def teardown_function(function):
-    """Remove the destination folder for output files as post-processing"""
+    # Remove the destination folder for output files as post-processing
     if os.path.exists(OUTPUT_FOLDER_PATH):
         shutil.rmtree(OUTPUT_FOLDER_PATH)
 
