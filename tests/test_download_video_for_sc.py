@@ -1,3 +1,4 @@
+import json
 import os
 import shutil
 
@@ -9,52 +10,24 @@ from src.twitter_video_dl.twitter_video_dl import download_video_for_sc
 
 OUTPUT_FOLDER_PATH = "./tests/output"
 
+# Open setting file
+with open("./src/twitter_video_dl/settings.json", "r") as f:
+    data = json.load(f)
 
-def test_download_videos():
-    # Forking source test case-based test function
+# Get the value of convert_gif_flag
+convert_gif_flag = data["gif"]["convert_gif_flag"]
 
-    # Get TOML file
-    toml = TOMLFile("./tests/TestVideos.toml")
-    toml_data = toml.read()
-    toml_get_data = toml_data.get("videos")
+# Get ffmpeg loglevel
+ffmpeg_loglevel = data["ffmpeg"]["loglevel"]
 
-    # Get the "url" and "audio_check_flag" of each element to see if the video can be retrieved and saved correctly
-    for video in toml_get_data:
-        url = video.get("url")
-        acf = video.get("audio_check_flag")
-        download_video_for_sc(url, "test", output_folder_path=OUTPUT_FOLDER_PATH)
-        if acf:
-            print(f"audio_check_flag: {acf}, url: {url}")
-            check_video(f"{OUTPUT_FOLDER_PATH}/test.mp4", audio_check_flag=acf)
-            os.remove(f"{OUTPUT_FOLDER_PATH}/test.mp4")
-        else:
-            print(f"audio_check_flag: {acf}, url: {url}")
-            check_video(f"{OUTPUT_FOLDER_PATH}/test.gif", audio_check_flag=acf)
-            os.remove(f"{OUTPUT_FOLDER_PATH}/test.gif")
+# Get image save option
+image_save_option = data["image"]["save_option"]
 
 
-def test_download_video4_success():
-    # Test function for the case where multiple video files are submitted in one post
-    url = "https://x.com/tw_7rikazhexde/status/1710678217575801015?s=20"
-    download_video_for_sc(url, "test", output_folder_path=OUTPUT_FOLDER_PATH)
-    check_video(f"{OUTPUT_FOLDER_PATH}/test_1.mp4", audio_check_flag=True)
-    check_video(f"{OUTPUT_FOLDER_PATH}/test_2.mp4", audio_check_flag=True)
-    check_video(f"{OUTPUT_FOLDER_PATH}/test_3.mp4", audio_check_flag=True)
-    check_video(f"{OUTPUT_FOLDER_PATH}/test_4.mp4", audio_check_flag=True)
-
-
-def test_download_video1_success():
-    # Test function for the case where one video file is submitted in one post (with output file name specified)
-    url = "https://x.com/tw_7rikazhexde/status/1710868951109124552?s=20"
-    download_video_for_sc(url, "test", output_folder_path=OUTPUT_FOLDER_PATH)
-    check_video(f"{OUTPUT_FOLDER_PATH}/test.mp4", audio_check_flag=True)
-
-
-def test_download_video_non_filename_success():
-    # Test function for the case where one video file is submitted in one post (no output file name specified)
-    url = "https://x.com/tw_7rikazhexde/status/1710868951109124552?s=20"
-    download_video_for_sc(url, "", output_folder_path=OUTPUT_FOLDER_PATH)
-    check_video(f"{OUTPUT_FOLDER_PATH}/output.mp4", audio_check_flag=True)
+def teardown_function(function):
+    # Remove the destination folder for output files as post-processing
+    if os.path.exists(OUTPUT_FOLDER_PATH):
+        shutil.rmtree(OUTPUT_FOLDER_PATH)
 
 
 def test_download_video_failure():
@@ -68,48 +41,47 @@ def test_download_video_failure():
     )
 
 
-def test_download_gif_filename():
-    # Test function for cases where a gif file is submitted (with output file name specified)
-    url = "https://x.com/tw_7rikazhexde/status/1735502484700057703?s=20"
-    download_video_for_sc(url, "", output_folder_path=OUTPUT_FOLDER_PATH)
-    check_video(f"{OUTPUT_FOLDER_PATH}/output.gif")
+def test_download_videos():
+    # Forking source test case-based test function
+
+    # Get TOML file
+    toml = TOMLFile("./tests/test_data.toml")
+    toml_data = toml.read()
+    toml_get_data = toml_data.get("tests")  # Change "videos" to "tests"
+
+    # Get the "url" and "file_name" of each element to see if the video can be retrieved and saved correctly
+    for test in toml_get_data:  # Change "video" to "test"
+        url = test.get("url")
+        file_name = test.get("file_name")  # Get the file_name from TOML
+        download_video_for_sc(
+            url, file_name, output_folder_path=OUTPUT_FOLDER_PATH
+        )  # Pass file_name to download_video_for_sc
+        expected_files = test.get(
+            "expected_files", []
+        )  # Get expected_files list from TOML
+        acf_list = test.get("audio_check_flag", [])
+        for expected_file, acf in zip(
+            expected_files, acf_list
+        ):  # Iterate through expected_files list and corresponding audio_check_flag list
+            print(f"acf={acf} / expected_file={expected_file}")
+            file_path = os.path.join(OUTPUT_FOLDER_PATH, expected_file)
+            check_file(file_path)
+            check_video(
+                file_path, audio_check_flag=acf
+            )  # Call check_video for each expected_file
+            os.remove(file_path)
 
 
-def test_download_gif_non_filename():
-    # Test function for cases where a gif file is submitted (without specifying the output filename)
-    url = "https://x.com/tw_7rikazhexde/status/1735503057079951364?s=20"
-    download_video_for_sc(url, "gif_test", output_folder_path=OUTPUT_FOLDER_PATH)
-    check_video(f"{OUTPUT_FOLDER_PATH}/gif_test.gif")
+def check_file(file_path: str) -> None:
+    """Check if the file exists.
 
+    Args:
+        file_path (str): Path of the file to check.
 
-def test_download_video1_non_avc1_success():
-    # Test function for cases where videos not supporting AVC1 encoding are submitted
-    url = "https://x.com/tw_7rikazhexde/status/1650804112987136000?s=20"
-    download_video_for_sc(url, "test", output_folder_path=OUTPUT_FOLDER_PATH)
-    check_video(f"{OUTPUT_FOLDER_PATH}/test.mp4", audio_check_flag=True)
-
-
-def test_download_video1_avc1_success():
-    # Test function for the case where a video is submitted that supports AVC1 encoding
-    url = "https://x.com/tw_7rikazhexde/status/1710868951109124552?s=20"
-    download_video_for_sc(url, "test", output_folder_path=OUTPUT_FOLDER_PATH)
-    check_video(f"{OUTPUT_FOLDER_PATH}/test.mp4", audio_check_flag=True)
-
-
-def test_download_video2_success_non_card_type_entities():
-    # Test function for a case where an image and a video are posted in one post
-    # Type: non_card_type_entities
-    # Filename: specified
-    url = "https://twitter.com/tw_7rikazhexde/status/1703315760767197365?s=20"
-    download_video_for_sc(url, "test", output_folder_path=OUTPUT_FOLDER_PATH)
-    check_video(f"{OUTPUT_FOLDER_PATH}/test_1.mp4", audio_check_flag=True)
-    check_video(f"{OUTPUT_FOLDER_PATH}/test_2.mp4", audio_check_flag=True)
-
-
-def teardown_function(function):
-    # Remove the destination folder for output files as post-processing
-    if os.path.exists(OUTPUT_FOLDER_PATH):
-        shutil.rmtree(OUTPUT_FOLDER_PATH)
+    Raises:
+        AssertionError: If the file does not exist.
+    """
+    assert os.path.exists(file_path), f"File {file_path} does not exist!"
 
 
 def check_video(video_file_path: str, audio_check_flag: bool = False) -> None:

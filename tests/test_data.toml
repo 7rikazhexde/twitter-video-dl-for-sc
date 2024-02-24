@@ -1,0 +1,146 @@
+title = "Test file(TOML) for twitter-video-dl-for-sc"
+
+# Definition rules
+# Create a video table and fill in "url" and "audio_check_flag" as a set.
+# Specify false for ".gif" and true for ".mp4".
+
+[[tests]]
+url = "https://x.com/tw_7rikazhexde/status/1710868951109124552?s=20"
+file_name = ""
+output_directory = "../output"
+expected_files = ["output.mp4"]
+audio_check_flag = [true]
+
+[[tests]]
+url = "https://x.com/tw_7rikazhexde/status/1710868951109124552?s=20"
+file_name = "test"
+output_directory = "../output"
+expected_files = ["test.mp4"]
+audio_check_flag = [true]
+
+[[tests]]
+url = "https://x.com/tw_7rikazhexde/status/1710678217575801015?s=20"
+file_name = ""
+output_directory = "../output"
+expected_files = ["output_1.mp4", "output_2.mp4", "output_3.mp4", "output_4.mp4"]
+audio_check_flag = [true,true,true,true]
+
+[[tests]]
+url = "https://x.com/tw_7rikazhexde/status/1710678217575801015?s=20"
+file_name = "test"
+output_directory = "../output"
+expected_files = ["test_1.mp4", "test_2.mp4", "test_3.mp4", "test_4.mp4"]
+audio_check_flag = [true,true,true,true]
+
+[[tests]]
+url = "https://x.com/tw_7rikazhexde/status/1710868951109124552?s=20"
+file_name = ""
+output_directory = "../output"
+expected_files = ["output.mp4"]
+audio_check_flag = [true]
+
+[[tests]]
+url = "https://x.com/tw_7rikazhexde/status/1710868951109124552?s=20"
+file_name = "git-test"
+output_directory = "../output"
+expected_files = ["git-test.mp4"]
+audio_check_flag = [true]
+
+[[test]]
+url = "https://x.com/tw_7rikazhexde/status/1735502484700057703?s=20"
+file_name = "test"
+output_directory = "../output"
+expected_files = ["test.gif"]
+audio_check_flag = [false]
+
+[[test]]
+url = "https://x.com/tw_7rikazhexde/status/1754040936005538201?s=20"
+file_name = "mix-test"
+output_directory = "../output"
+expected_files = [
+    "mix-test_1.jpg",
+    "mix-test_2.jpg",
+    "mix-test_1.mp4",
+    "mix-test_2.mp4"
+]
+audio_check_flag = [false,false,true,true]
+
+# non card type
+[[videos]]
+url = "https://twitter.com/gujarat_titans/status/1655207515162832897"
+file_name = ""
+output_directory = "../output"
+expected_files = ["output.gif"]
+audio_check_flag = [false]
+
+# card type
+[[videos]]
+url = "https://twitter.com/GOTGTheGame/status/1451361961782906889"
+file_name = ""
+output_directory = "../output"
+expected_files = ["output.mp4"]
+audio_check_flag = [true]
+
+# non card type
+[[videos]]
+url = "https://twitter.com/james_a_rob/status/1451958941886435329"
+file_name = ""
+output_directory = "../output"
+expected_files = ["output.mp4"]
+audio_check_flag = [true]
+
+# non card type
+[[videos]]
+url = "https://twitter.com/iamdariusalford/status/1452487813572829185"
+file_name = ""
+output_directory = "../output"
+expected_files = ["output.mp4"]
+audio_check_flag = [true]
+
+# non card type
+[[videos]]
+url = "https://twitter.com/Queen__Deshda/status/1452467693517426697"
+file_name = ""
+output_directory = "../output"
+expected_files = ["output.mp4"]
+audio_check_flag = [true]
+
+# non card type
+[[videos]]
+url = "https://twitter.com/jackposobiec/status/1644904637810573312?s=46&t=C4RATVnzrLTKmtxPwRNPQQ"
+file_name = ""
+output_directory = "../output"
+expected_files = ["output.mp4"]
+audio_check_flag = [true]
+
+# non card type
+[[videos]]
+url = "https://twitter.com/Ballislife/status/1452473447053922305"
+file_name = ""
+output_directory = "../output"
+expected_files = ["output.mp4"]
+audio_check_flag = [true]
+
+# non card type
+[[videos]]
+url = "https://twitter.com/YahooSports/status/1452467898358718471"
+file_name = ""
+output_directory = "../output"
+expected_files = ["output.mp4"]
+audio_check_flag = [true]
+
+# non card type
+[[videos]]
+url = "https://twitter.com/BleacherReport/status/1452444953435533312"
+file_name = ""
+output_directory = "../output"
+expected_files = ["output.mp4"]
+audio_check_flag = [true]
+
+# non card type
+[[videos]]
+url = "https://twitter.com/lilteish/status/1094410530335481856"
+file_name = ""
+output_directory = "../output"
+expected_files = ["output.mp4"]
+audio_check_flag = [true]
