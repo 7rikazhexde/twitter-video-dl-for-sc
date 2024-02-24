@@ -5,5 +5,8 @@
   },
   "ffmpeg": {
     "loglevel": "error"
+  },
+  "image":{
+    "save_option": false
   }
 }

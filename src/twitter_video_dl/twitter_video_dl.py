@@ -32,6 +32,9 @@ convert_gif_flag = data["gif"]["convert_gif_flag"]
 # Get ffmpeg loglevel
 ffmpeg_loglevel = data["ffmpeg"]["loglevel"]
 
+# Get image save option
+image_save_option = data["image"]["save_option"]
+
 
 def get_tokens(tweet_url):
     """
@@ -465,6 +468,7 @@ def download_video(tweet_url, output_file, target_all_videos=False):
 
 def create_video_urls(json_data):
     data = json.loads(json_data)
+
     gif_ptn = False
     media_list = None
 
@@ -491,6 +495,10 @@ def create_video_urls(json_data):
         except KeyError:
             pass
 
+    img_urls = []
+    img_urls = get_img_url(media_list)
+    # get_img(img_urls, "output")
+
     if media_list:
         if "video_info" in media_list[0]:
             video_url_list, gif_ptn = get_non_card_type_extended_entities_vid_urls(
@@ -503,7 +511,70 @@ def create_video_urls(json_data):
     else:
         video_url_list = []
 
-    return video_url_list, gif_ptn
+    return video_url_list, gif_ptn, img_urls
+
+
+def get_img_url(media_list):
+    img_urls = []
+
+    for media in media_list:
+        media_url = media.get("media_url_https")
+        if media_url.startswith("https://pbs.twimg.com/media"):
+            img_urls.append(media_url)
+
+    return img_urls
+
+
+def get_img(urls, file_name):
+    output_folder_path = "./output"
+    os.makedirs(output_folder_path, exist_ok=True)
+    num = len(urls)
+    for i, url in enumerate(urls, start=1):
+        if file_name == "":
+            if num > 1:
+                filename = f"{output_folder_path}/output_{i}"
+            else:
+                filename = f"{output_folder_path}/output"
+        else:
+            if num > 1:
+                filename = f"{output_folder_path}/{file_name}_{i}"
+            else:
+                filename = f"{output_folder_path}/{file_name}"
+
+        # Ask the user if the file should be overwritten if it exists
+        output_file_name = f"{filename}.jpg"
+
+        if os.path.exists(output_file_name):
+            while True:
+                response = (
+                    input(
+                        f"The file '{output_file_name}' already exists. Do you want to overwrite it? (y/n): "
+                    )
+                    .strip()
+                    .lower()
+                )
+                if response == "y":
+                    break
+                elif response == "n":
+                    print("Exit the program.")
+                    return
+                else:
+                    print("Invalid input. Please enter 'y' or 'n'.")
+
+        with requests.get(url, stream=True) as response:
+            if response.status_code == 200:
+                with open(output_file_name, "wb") as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                    print(f"Image {output_file_name} downloaded successfully.")
+            else:
+                print(
+                    f"Failed to download image from {url}. Status code: {response.status_code}"
+                )
+                print(
+                    f"If you are using the correct Twitter URL this suggests a bug in the script. Please open a GitHub issue and copy and paste this message. Tweet url: {url}"
+                )
 
 
 def get_card_type_vid_url(data):
@@ -665,11 +736,16 @@ def download_videos(video_urls, output_file, output_folder_path, gif_ptn):
                 # Delete mp4 after creating gif file
                 subprocess.run(["rm", f"{filename}.mp4"])
                 print(f"Video Convert Success(mp4 to gif): {filename}.gif")
-    print("All videos downloaded successfully.")
+    if image_save_option:
+        print("All videos(gifs) & images downloaded successfully.")
+    else:
+        print("All videos(gifs) downloaded successfully.")
 
 
 def download_video_for_sc(tweet_url, output_file="", output_folder_path="./output"):
     bearer_token, guest_token = get_tokens(tweet_url)
     resp = get_tweet_details(tweet_url, guest_token, bearer_token)
-    video_urls, gif_ptn = create_video_urls(resp.text)
+    video_urls, gif_ptn, img_urls = create_video_urls(resp.text)
+    if image_save_option:
+        get_img(img_urls, output_file)
     download_videos(video_urls, output_file, output_folder_path, gif_ptn)
