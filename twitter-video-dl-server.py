@@ -13,6 +13,7 @@ class RequestHandler(BaseHTTPRequestHandler):
         url = params.get("url", [""])[0]
         fileName = params.get("fileName", [""])[0]
         if url:
+            fileName = fileName.replace(" ", "_").replace("　", "_").replace("/", "-")
             tvdl.download_video_for_sc(url, fileName)
             self.send_response(200)
             self.send_header("Content-type", "text/html")

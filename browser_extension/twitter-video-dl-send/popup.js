@@ -45,7 +45,14 @@ window.addEventListener('DOMContentLoaded', () => {
 document.getElementById('sendCurrentUrl').addEventListener('click', function() {
     const fileName = document.getElementById('fileNameInput').value;
     chrome.tabs.query({active: true, currentWindow: true}, tabs => {
-        chrome.runtime.sendMessage({action: "sendUrl", url: tabs[0].url, fileName: fileName});
+        chrome.runtime.sendMessage({action: "sendUrl", url: tabs[0].url, fileName: fileName}).catch((error) => {
+            console.log(error);
+            chrome.runtime.sendMessage({action: "getLastError"}, response => {
+                if (response.error) {
+                    alert(response.error);
+                }
+            });
+        });
     });
     this.style.backgroundColor = '#888888';
     this.innerText = text[languageSelect.value].sent;
@@ -59,7 +66,14 @@ document.getElementById('sendInputUrl').addEventListener('click', function() {
     const url = document.getElementById('urlInput').value;
     const fileName = document.getElementById('fileNameInput').value;
     if (url) {
-        chrome.runtime.sendMessage({action: "sendUrl", url: url, fileName: fileName});
+        chrome.runtime.sendMessage({action: "sendUrl", url: url, fileName: fileName}).catch((error) => {
+            console.log(error);
+            chrome.runtime.sendMessage({action: "getLastError"}, response => {
+                if (response.error) {
+                    alert(response.error);
+                }
+            });
+        });
         this.style.backgroundColor = '#888888';
         this.innerText = text[languageSelect.value].sent;
         setTimeout(() => {
