@@ -51,7 +51,10 @@ def test_download_videos():
 
     # Get the "url" and "file_name" of each element to see if the video can be retrieved and saved correctly
     for test in toml_get_data:  # Change "video" to "test"
+        title = test.get("title")
+        print(f"\n----------------------------- {title} -----------------------------")
         url = test.get("url")
+        print(f"url={url}")
         file_name = test.get("file_name")  # Get the file_name from TOML
         download_video_for_sc(
             url, file_name, output_folder_path=OUTPUT_FOLDER_PATH
