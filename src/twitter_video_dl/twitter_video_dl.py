@@ -487,7 +487,6 @@ def create_video_urls(json_data):
         pass
 
     if media_list is None:
-        # print("non cardtype")
         try:
             media_list = data["data"]["tweetResult"]["result"]["legacy"][
                 "extended_entities"
@@ -497,7 +496,6 @@ def create_video_urls(json_data):
 
     img_urls = []
     img_urls = get_img_url(media_list)
-    # get_img(img_urls, "output")
 
     if media_list:
         if "video_info" in media_list[0]:
@@ -516,30 +514,36 @@ def create_video_urls(json_data):
 
 def get_img_url(media_list):
     img_urls = []
-
     for media in media_list:
         media_url = media.get("media_url_https")
-        if media_url.startswith("https://pbs.twimg.com/media"):
+        media_type = media.get("type")
+        if (
+            media_url
+            and media_url.startswith("https://pbs.twimg.com/media")
+            and media_type == "photo"
+        ):
             img_urls.append(media_url)
-
     return img_urls
 
 
-def get_img(urls, file_name):
-    output_folder_path = "./output"
+def get_img(urls, file_name, output_folder_path):
     os.makedirs(output_folder_path, exist_ok=True)
     num = len(urls)
     for i, url in enumerate(urls, start=1):
         if file_name == "":
             if num > 1:
-                filename = f"{output_folder_path}/output_{i}"
+                save_filename = f"output_{i}"
+                filename = f"{output_folder_path}/{save_filename}]"
             else:
-                filename = f"{output_folder_path}/output"
+                save_filename = "output"
+                filename = f"{output_folder_path}/{save_filename}"
         else:
             if num > 1:
-                filename = f"{output_folder_path}/{file_name}_{i}"
+                save_filename = f"{file_name}_{i}"
+                filename = f"{output_folder_path}/{save_filename}"
             else:
-                filename = f"{output_folder_path}/{file_name}"
+                save_filename = file_name
+                filename = f"{output_folder_path}/{save_filename}"
 
         # Ask the user if the file should be overwritten if it exists
         output_file_name = f"{filename}.jpg"
@@ -678,14 +682,18 @@ def download_videos(video_urls, output_file, output_folder_path, gif_ptn):
     for i, video_url in enumerate(video_urls, start=1):
         if output_file == "":
             if num > 1:
-                filename = f"{output_folder_path}/output_{i}"
+                save_filename = f"output_{i}"
+                filename = f"{output_folder_path}/{save_filename}"
             else:
-                filename = f"{output_folder_path}/output"
+                save_filename = "output"
+                filename = f"{output_folder_path}/{save_filename}"
         else:
             if num > 1:
-                filename = f"{output_folder_path}/{output_file}_{i}"
+                save_filename = f"{output_file}_{i}"
+                filename = f"{output_folder_path}/{save_filename}"
             else:
-                filename = f"{output_folder_path}/{output_file}"
+                save_filename = output_file
+                filename = f"{output_folder_path}/{save_filename}"
 
         # Ask the user if the file should be overwritten if it exists
         output_file_name = f"{filename}.mp4"
@@ -747,5 +755,5 @@ def download_video_for_sc(tweet_url, output_file="", output_folder_path="./outpu
     resp = get_tweet_details(tweet_url, guest_token, bearer_token)
     video_urls, gif_ptn, img_urls = create_video_urls(resp.text)
     if image_save_option:
-        get_img(img_urls, output_file)
+        get_img(img_urls, output_file, output_folder_path)
     download_videos(video_urls, output_file, output_folder_path, gif_ptn)

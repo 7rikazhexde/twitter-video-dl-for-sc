@@ -22,7 +22,7 @@ This project is based on the original code of the [inteoryx / twitter-video-dl](
 
 ## Demo (Shortcuts)
 
-|One video per post|Mixing images and videos in one post|Mixing images and videos in a thread(*1)|
+|One video per post|Mixing images and videos in one post(*1)|Mixing images and videos in a thread(*1)|
 |:---:|:---:|:---:|
 |<img src="./demo/demo1_v1_30fps_400x866.gif" width="80%" alt="One video per post">|<img src="./demo/demo2_v1_30fps_400x866.gif" width="80%" alt="Mixing images and videos in one post">|<img src="./demo/demo3_v3_30fps_400x866.gif" width="80%" alt="Mixing images and videos in a thread">|
 |[Original Post Link(Media)](https://x.com/tw_7rikazhexde/status/1650804112987136000?s=20)|[Original Post Link(Media)](https://twitter.com/tw_7rikazhexde/status/1650808610157662211?s=20)|[Original Post Link(Media)](https://x.com/tw_7rikazhexde/status/1754040936005538201?s=20)|
@@ -31,7 +31,7 @@ This project is based on the original code of the [inteoryx / twitter-video-dl](
 
 ## Demo (Shortcuts for Mac Browser)
 
-<img src="./demo/demo1_twitter-video-dl-sc-for-mac_60fps_1440x900.gif" alt="twitter-video-dl-sc-for-mac demo">
+<img src="./demo/demo1_twitter-video-dl-sc-for-mac_30fps_1440x900.gif" alt="twitter-video-dl-sc-for-mac demo">
 
 ## Demo (Browser Extension)
 
@@ -146,8 +146,8 @@ twitter-video-dl-for-sc uses ffmpeg for saving videos. Therefore, we provide a t
 
 ### Usage
 
-If you get an error with the specified URL, please register an issue. If you want to test individually, you can test in advance by adding the URL of the post where the video was posted to `tests/TestVideos.toml`.
+If you get an error with the specified URL, please register an issue. If you want to test individually, you can test in advance by adding the URL of the post where the video was posted to [test_data.toml](./tests/test_data.toml).
 
 > [!NOTE]
 > **- The test environment depends on **pytest**, which is added as part of the dev environment dependency files with the `poetry install` command.**  
-> **- You can run the test command in `poetry run pytest tests/test_download_video_for_sc.py`.**
+> **- You can run the test command in `poetry run pytest --html=pytest-html/report.html`.**
