@@ -22,7 +22,7 @@ repos:
   # https://python-poetry.org/docs/pre-commit-hooks/#usage
   - repo: https://github.com/python-poetry/poetry
     # Cannot be executed with local designation (as of 23.10.8)
-    rev: 1.7.1
+    rev: 1.8.3
     hooks:
       - id: poetry-check
         verbose: true
@@ -39,7 +39,7 @@ repos:
         files: ^pyproject\.toml$
 
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.2.0
+    rev: v0.4.4
     hooks:
       - id: ruff
         args: [ --fix ]
