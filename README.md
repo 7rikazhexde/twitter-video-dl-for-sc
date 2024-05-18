@@ -2,9 +2,15 @@
 
 This project is based on the original code of the [inteoryx / twitter-video-dl](https://github.com/inteoryx/twitter-video-dl) project, which allows users to download X(Twitter) App videos as MP4 files using Python, FFmpeg and URLs without the need for API keys. I forked this project for use in iOS Shortcuts application.
 
+## ⚠️ Notice
+Currently, the latest changes have not been reflected in the [master/main](https://github.com/7rikazhexde/twitter-video-dl-for-sc/tree/main) branch of this project.  
+Please use the [dev_bug_16](https://github.com/7rikazhexde/twitter-video-dl-for-sc/tree/dev_bug_16) branch instead. The [dev_bug_16](https://github.com/7rikazhexde/twitter-video-dl-for-sc/tree/dev_bug_16) branch contains bug fixes for Issue [#16](https://github.com/7rikazhexde/twitter-video-dl-for-sc/issues/16).  
+I'm temporarily managing the code in this branch to address changes in X(formerly Twitter) specifications.
+
 ## ToC
 
 - [twitter-video-dl-for-sc](#twitter-video-dl-for-sc)
+  - [⚠️ Notice](#️-notice)
   - [ToC](#toc)
   - [Demo (Shortcuts)](#demo-shortcuts)
   - [Demo (Shortcuts for Mac Browser)](#demo-shortcuts-for-mac-browser)
