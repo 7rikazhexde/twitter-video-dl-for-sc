@@ -1,3 +1,4 @@
+import inspect
 import json
 import os
 import re
@@ -35,6 +36,31 @@ ffmpeg_loglevel = data["ffmpeg"]["loglevel"]
 # Get image save option
 image_save_option = data["image"]["save_option"]
 
+# Get debug option
+debug_option = data["debug_option"]
+
+
+def delete_debug_log(debug_option=False):
+    if debug_option:
+        if os.path.exists("debug.log"):
+            os.remove("debug.log")
+            print("Debug log file deleted.")
+        else:
+            print("Debug log file does not exist.")
+
+
+def debug_write_log(message, debug_option=False):
+    if debug_option:
+        caller_frame = inspect.stack()[1]
+        caller_function = caller_frame.function
+        caller_lineno = caller_frame.lineno
+        debug_message = (
+            f"[DEBUG] Function: {caller_function}, Line: {caller_lineno}\n{message}\n"
+        )
+
+        with open("debug.log", "a") as log_file:
+            log_file.write(debug_message)
+
 
 def get_tokens(tweet_url):
     """
@@ -55,6 +81,7 @@ def get_tokens(tweet_url):
 
     session = requests.Session()
     response = session.get(tweet_url, headers=headers)
+    debug_write_log(response.text, debug_option)
 
     assert (
         response.status_code == 200
@@ -75,6 +102,7 @@ def get_tokens(tweet_url):
     tok = tok_match.group(1)
 
     response = session.get(redirect_url, headers=headers, allow_redirects=False)
+    debug_write_log(response.text, debug_option)
 
     assert (
         response.status_code == 200
@@ -94,6 +122,8 @@ def get_tokens(tweet_url):
     response = session.post(
         auth_url, data=auth_params, headers=headers, allow_redirects=True
     )
+
+    debug_write_log(response.text, debug_option)
 
     assert (
         response.status_code == 200
@@ -127,6 +157,8 @@ def get_tokens(tweet_url):
     guest_token_response = session.post(
         "https://api.twitter.com/1.1/guest/activate.json"
     )
+
+    debug_write_log(guest_token_response.text, debug_option)
 
     assert (
         guest_token_response.status_code == 200
@@ -169,6 +201,10 @@ def get_tweet_details(tweet_url, guest_token, bearer_token):
         },
     )
 
+    debug_write_log(
+        json.dumps(json.loads(details.text), indent=2, ensure_ascii=False), debug_option
+    )
+
     max_retries = 10
     cur_retry = 0
     while details.status_code == 400 and cur_retry < max_retries:
@@ -204,6 +240,11 @@ def get_tweet_details(tweet_url, guest_token, bearer_token):
                 "authorization": f"Bearer {bearer_token}",
                 "x-guest-token": guest_token,
             },
+        )
+
+        debug_write_log(
+            json.dumps(json.loads(details.text), indent=2, ensure_ascii=False),
+            debug_option,
         )
 
         cur_retry += 1
@@ -783,6 +824,7 @@ def download_videos(video_urls, output_file, output_folder_path, gif_ptn):
 
 
 def download_video_for_sc(tweet_url, output_file="", output_folder_path="./output"):
+    delete_debug_log(debug_option)
     bearer_token, guest_token = get_tokens(tweet_url)
     resp = get_tweet_details(tweet_url, guest_token, bearer_token)
     video_urls, gif_ptn, img_urls = create_video_urls(resp.text)
