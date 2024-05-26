@@ -8,5 +8,6 @@
   },
   "image":{
     "save_option": false
-  }
+  },
+  "debug_option": false
 }

@@ -1,3 +1,4 @@
+import inspect
 import json
 import os
 import re
@@ -35,6 +36,31 @@ ffmpeg_loglevel = data["ffmpeg"]["loglevel"]
 # Get image save option
 image_save_option = data["image"]["save_option"]
 
+# Get debug option
+debug_option = data["debug_option"]
+
+
+def delete_debug_log(debug_option=False):
+    if debug_option:
+        if os.path.exists("debug.log"):
+            os.remove("debug.log")
+            print("Debug log file deleted.")
+        else:
+            print("Debug log file does not exist.")
+
+
+def debug_write_log(message, debug_option=False):
+    if debug_option:
+        caller_frame = inspect.stack()[1]
+        caller_function = caller_frame.function
+        caller_lineno = caller_frame.lineno
+        debug_message = (
+            f"[DEBUG] Function: {caller_function}, Line: {caller_lineno}\n{message}\n"
+        )
+
+        with open("debug.log", "a") as log_file:
+            log_file.write(debug_message)
+
 
 def get_tokens(tweet_url):
     """
@@ -48,63 +74,101 @@ def get_tokens(tweet_url):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0",
         "Accept": "*/*",
-        "Accept-Language": "de,en-US;q=0.7,en;q=0.3",
+        "Accept-Language": "en-US, en, *;q=0.5",
         "Accept-Encoding": "gzip, deflate, br",
         "TE": "trailers",
     }
 
-    html = requests.get(tweet_url, headers=headers)
+    session = requests.Session()
+    response = session.get(tweet_url, headers=headers)
+    debug_write_log(response.text, debug_option)
 
     assert (
-        html.status_code == 200
-    ), f"Failed to get tweet page.  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Status code: {html.status_code}.  Tweet url: {tweet_url}"
+        response.status_code == 200
+    ), f"Failed to get tweet page. Status code: {response.status_code}. Tweet url: {tweet_url}"
+
+    redirect_url_match = re.search(
+        r'content="0; url = (https://twitter\.com/[^"]+)"', response.text
+    )
+    assert (
+        redirect_url_match is not None
+    ), f"Failed to find redirect URL. Tweet url: {tweet_url}"
+    redirect_url = redirect_url_match.group(1)
+
+    tok_match = re.search(r'tok=([^&"]+)', redirect_url)
+    assert (
+        tok_match is not None
+    ), f"Failed to find 'tok' parameter in redirect URL. Redirect URL: {redirect_url}"
+    tok = tok_match.group(1)
+
+    response = session.get(redirect_url, headers=headers, allow_redirects=False)
+    debug_write_log(response.text, debug_option)
+
+    assert (
+        response.status_code == 200
+    ), f"Failed to get redirect page. Status code: {response.status_code}. Redirect URL: {redirect_url}"
+
+    data_match = re.search(
+        r'<input type="hidden" name="data" value="([^"]+)"', response.text
+    )
+    assert (
+        data_match is not None
+    ), f"Failed to find 'data' parameter in redirect page. Redirect URL: {redirect_url}"
+    data = data_match.group(1)
+
+    auth_url = "https://x.com/x/migrate"
+    auth_params = {"tok": tok, "data": data}
+
+    response = session.post(
+        auth_url, data=auth_params, headers=headers, allow_redirects=True
+    )
+
+    debug_write_log(response.text, debug_option)
+
+    assert (
+        response.status_code == 200
+    ), f"Failed to authenticate. Status code: {response.status_code}. Auth URL: {auth_url}"
 
     mainjs_url = re.findall(
-        r"https://abs.twimg.com/responsive-web/client-web-legacy/main.[^\.]+.js",
-        html.text,
+        r"https://abs.twimg.com/responsive-web/client-web-legacy/main\.[^\.]+\.js",
+        response.text,
     )
 
     assert (
         mainjs_url is not None and len(mainjs_url) > 0
-    ), f"Failed to find main.js file.  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Tweet url: {tweet_url}"
+    ), f"Failed to find main.js file. If you are using the correct Twitter URL this suggests a bug in the script. Please open a GitHub issue and copy and paste this message. Tweet url: {tweet_url}"
 
     mainjs_url = mainjs_url[0]
-    mainjs = requests.get(mainjs_url)
+    mainjs = session.get(mainjs_url)
 
     assert (
         mainjs.status_code == 200
-    ), f"Failed to get main.js file.  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Status code: {mainjs.status_code}.  Tweet url: {tweet_url}"
+    ), f"Failed to get main.js file. If you are using the correct Twitter URL this suggests a bug in the script. Please open a GitHub issue and copy and paste this message. Status code: {mainjs.status_code}. Tweet url: {tweet_url}"
 
     bearer_token = re.findall(r'AAAAAAAAA[^"]+', mainjs.text)
 
     assert (
         bearer_token is not None and len(bearer_token) > 0
-    ), f"Failed to find bearer token.  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Tweet url: {tweet_url}, main.js url: {mainjs_url}"
+    ), f"Failed to find bearer token. If you are using the correct Twitter URL this suggests a bug in the script. Please open a GitHub issue and copy and paste this message. Tweet url: {tweet_url}, main.js url: {mainjs_url}"
 
     bearer_token = bearer_token[0]
 
-    # get the guest token
-    with requests.Session() as s:
-        s.headers.update(
-            {
-                "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0",
-                "accept": "*/*",
-                "accept-language": "de,en-US;q=0.7,en;q=0.3",
-                "accept-encoding": "gzip, deflate, br",
-                "te": "trailers",
-            }
-        )
+    session.headers.update({"authorization": f"Bearer {bearer_token}"})
+    guest_token_response = session.post(
+        "https://api.twitter.com/1.1/guest/activate.json"
+    )
 
-        s.headers.update({"authorization": f"Bearer {bearer_token}"})
+    debug_write_log(guest_token_response.text, debug_option)
 
-        # activate bearer token and get guest token
-        guest_token = s.post("https://api.twitter.com/1.1/guest/activate.json").json()[
-            "guest_token"
-        ]
+    assert (
+        guest_token_response.status_code == 200
+    ), f"Failed to activate guest token. Status code: {guest_token_response.status_code}. Tweet url: {tweet_url}"
+
+    guest_token = guest_token_response.json()["guest_token"]
 
     assert (
         guest_token is not None
-    ), f"Failed to find guest token.  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Tweet url: {tweet_url}, main.js url: {mainjs_url}"
+    ), f"Failed to find guest token. If you are using the correct Twitter URL this suggests a bug in the script. Please open a GitHub issue and copy and paste this message. Tweet url: {tweet_url}, main.js url: {mainjs_url}"
 
     return bearer_token, guest_token
 
@@ -135,6 +199,10 @@ def get_tweet_details(tweet_url, guest_token, bearer_token):
             "authorization": f"Bearer {bearer_token}",
             "x-guest-token": guest_token,
         },
+    )
+
+    debug_write_log(
+        json.dumps(json.loads(details.text), indent=2, ensure_ascii=False), debug_option
     )
 
     max_retries = 10
@@ -172,6 +240,11 @@ def get_tweet_details(tweet_url, guest_token, bearer_token):
                 "authorization": f"Bearer {bearer_token}",
                 "x-guest-token": guest_token,
             },
+        )
+
+        debug_write_log(
+            json.dumps(json.loads(details.text), indent=2, ensure_ascii=False),
+            debug_option,
         )
 
         cur_retry += 1
@@ -751,6 +824,7 @@ def download_videos(video_urls, output_file, output_folder_path, gif_ptn):
 
 
 def download_video_for_sc(tweet_url, output_file="", output_folder_path="./output"):
+    delete_debug_log(debug_option)
     bearer_token, guest_token = get_tokens(tweet_url)
     resp = get_tweet_details(tweet_url, guest_token, bearer_token)
     video_urls, gif_ptn, img_urls = create_video_urls(resp.text)
