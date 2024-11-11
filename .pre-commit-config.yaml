@@ -3,8 +3,7 @@ fail_fast: true
 # A list of repository mappings
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    # Specify version or tag to use (as of 23.5.31)
-    rev: v4.5.0
+    rev: v5.0.0
     hooks:
       # Remove spaces at end of lines except markdown
       - id: trailing-whitespace
@@ -21,25 +20,23 @@ repos:
 
   # https://python-poetry.org/docs/pre-commit-hooks/#usage
   - repo: https://github.com/python-poetry/poetry
-    # Cannot be executed with local designation (as of 23.10.8)
-    rev: 1.8.3
+    rev: 1.8.0
     hooks:
       - id: poetry-check
         verbose: true
       - id: poetry-lock
         verbose: true
       - id: poetry-export
-        args: ["-f", "requirements.txt", "-o", "requirements.txt"]
+        args: ["-f", "requirements.txt", "-o", "requirements.txt", "--without-hashes"]
         verbose: true
         files: ^pyproject\.toml$
       - id: poetry-export
-        name: poetry-export-dev
-        args: ["--dev", "-f", "requirements.txt", "-o", "requirements-dev.txt"]
+        args: ["--with", "dev", "-f", "requirements.txt", "-o", "requirements-dev.txt", "--without-hashes"]
         verbose: true
         files: ^pyproject\.toml$
 
   - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.4.5
+    rev: v0.7.3
     hooks:
       - id: ruff
         args: [ --fix ]

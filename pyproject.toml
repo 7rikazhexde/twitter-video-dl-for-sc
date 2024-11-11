@@ -1,5 +1,5 @@
 [tool.poetry]
-authors = ["7rikaz_h785 <7rikaz.h785.stat2ltas41lcijad@gmail.com>"]
+authors = ["7rikazhexde"]
 description = "This project is based on the original code of the [inteoryx / twitter-video-dl](https://github.com/inteoryx/twitter-video-dl) project, which allows users to download Twitter videos as MP4 files using Python, FFmpeg and URLs without the need for API keys. I forked this project for use in iOS Shortcuts application."
 license = "Unlicense"
 name = "twitter-video-dl-for-sc"
