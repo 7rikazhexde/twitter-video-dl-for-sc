@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "twitter-video-dl-send",
     "version": "0.0.2",
-    "author": "7rikaz_h785 <7rikaz.h785.stat2ltas41lcijad@gmail.com>",
+    "author": "7rikazhexde",
     "homepage_url": "https://github.com/7rikazhexde/twitter-video-dl-for-sc",
     "permissions": ["activeTab"],
     "host_permissions": ["http://localhost:3000/"],
