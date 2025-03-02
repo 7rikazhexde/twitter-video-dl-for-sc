@@ -83,75 +83,101 @@ def get_tokens(tweet_url):
     response = session.get(tweet_url, headers=headers)
     debug_write_log(response.text, debug_option)
 
-    assert (
-        response.status_code == 200
-    ), f"Failed to get tweet page. Status code: {response.status_code}. Tweet url: {tweet_url}"
+    assert response.status_code == 200, (
+        f"Failed to get tweet page. Status code: {response.status_code}. Tweet url: {tweet_url}"
+    )
 
+    # Multiple redirect detection methods
     redirect_url_match = re.search(
         r'content="0; url = (https://twitter\.com/[^"]+)"', response.text
     )
-    assert (
-        redirect_url_match is not None
-    ), f"Failed to find redirect URL. Tweet url: {tweet_url}"
-    redirect_url = redirect_url_match.group(1)
 
+    # Fallback to JavaScript redirect if meta refresh not found
+    if redirect_url_match is None:
+        js_redirect_match = re.search(
+            r'window\.location\.replace\("([^"]+)"\)', response.text
+        )
+        if js_redirect_match:
+            redirect_url_match = js_redirect_match
+
+    # Use original URL if no redirect found
+    if redirect_url_match is None:
+        redirect_url = tweet_url
+    else:
+        redirect_url = redirect_url_match.group(1)
+
+    # Attempt to find tok parameter (optional)
     tok_match = re.search(r'tok=([^&"]+)', redirect_url)
-    assert (
-        tok_match is not None
-    ), f"Failed to find 'tok' parameter in redirect URL. Redirect URL: {redirect_url}"
-    tok = tok_match.group(1)
+    tok = tok_match.group(1) if tok_match else None
 
     response = session.get(redirect_url, headers=headers, allow_redirects=False)
     debug_write_log(response.text, debug_option)
 
-    assert (
-        response.status_code == 200
-    ), f"Failed to get redirect page. Status code: {response.status_code}. Redirect URL: {redirect_url}"
+    assert response.status_code == 200, (
+        f"Failed to get redirect page. Status code: {response.status_code}. Redirect URL: {redirect_url}"
+    )
 
+    # Find data parameter (optional)
     data_match = re.search(
         r'<input type="hidden" name="data" value="([^"]+)"', response.text
     )
-    assert (
-        data_match is not None
-    ), f"Failed to find 'data' parameter in redirect page. Redirect URL: {redirect_url}"
-    data = data_match.group(1)
+    data = data_match.group(1) if data_match else None
 
+    # Prepare authentication request
     auth_url = "https://x.com/x/migrate"
-    auth_params = {"tok": tok, "data": data}
+    auth_params = {}
+    if tok:
+        auth_params["tok"] = tok
+    if data:
+        auth_params["data"] = data
 
-    response = session.post(
-        auth_url, data=auth_params, headers=headers, allow_redirects=True
-    )
+    # Only send auth request if we have parameters
+    if auth_params:
+        response = session.post(
+            auth_url, data=auth_params, headers=headers, allow_redirects=True
+        )
 
-    debug_write_log(response.text, debug_option)
+        debug_write_log(response.text, debug_option)
 
-    assert (
-        response.status_code == 200
-    ), f"Failed to authenticate. Status code: {response.status_code}. Auth URL: {auth_url}"
+        assert response.status_code == 200, (
+            f"Failed to authenticate. Status code: {response.status_code}. Auth URL: {auth_url}"
+        )
+    else:
+        response = session.get(redirect_url, headers=headers)
 
-    mainjs_url = re.findall(
-        r"https://abs.twimg.com/responsive-web/client-web-legacy/main\.[^\.]+\.js",
+    # Find main.js URL
+    mainjs_urls = re.findall(
+        r"https://abs\.twimg\.com/responsive-web/client-web-legacy/main\.[^\.]+\.js",
         response.text,
     )
 
-    assert (
-        mainjs_url is not None and len(mainjs_url) > 0
-    ), f"Failed to find main.js file. If you are using the correct Twitter URL this suggests a bug in the script. Please open a GitHub issue and copy and paste this message. Tweet url: {tweet_url}"
+    assert mainjs_urls is not None and len(mainjs_urls) > 0, (
+        f"Failed to find main.js file. Tweet url: {tweet_url}"
+    )
 
-    mainjs_url = mainjs_url[0]
+    mainjs_url = mainjs_urls[0]
     mainjs = session.get(mainjs_url)
 
-    assert (
-        mainjs.status_code == 200
-    ), f"Failed to get main.js file. If you are using the correct Twitter URL this suggests a bug in the script. Please open a GitHub issue and copy and paste this message. Status code: {mainjs.status_code}. Tweet url: {tweet_url}"
+    assert mainjs.status_code == 200, (
+        f"Failed to get main.js file. Status code: {mainjs.status_code}. Tweet url: {tweet_url}"
+    )
 
+    # Multiple methods to find bearer token
     bearer_token = re.findall(r'AAAAAAAAA[^"]+', mainjs.text)
 
-    assert (
-        bearer_token is not None and len(bearer_token) > 0
-    ), f"Failed to find bearer token. If you are using the correct Twitter URL this suggests a bug in the script. Please open a GitHub issue and copy and paste this message. Tweet url: {tweet_url}, main.js url: {mainjs_url}"
+    # Fallback method if first method fails
+    if not bearer_token:
+        bearer_token = re.findall(r'Bearer\s+([^\s"]+)', mainjs.text)
+
+    assert bearer_token is not None and len(bearer_token) > 0, (
+        f"Failed to find bearer token. Tweet url: {tweet_url}, main.js url: {mainjs_url}"
+    )
 
     bearer_token = bearer_token[0]
+
+    # Remove "Bearer " prefix if present
+    if bearer_token.startswith("Bearer "):
+        bearer_token = bearer_token.replace("Bearer ", "")
 
     session.headers.update({"authorization": f"Bearer {bearer_token}"})
     guest_token_response = session.post(
@@ -160,15 +186,15 @@ def get_tokens(tweet_url):
 
     debug_write_log(guest_token_response.text, debug_option)
 
-    assert (
-        guest_token_response.status_code == 200
-    ), f"Failed to activate guest token. Status code: {guest_token_response.status_code}. Tweet url: {tweet_url}"
+    assert guest_token_response.status_code == 200, (
+        f"Failed to activate guest token. Status code: {guest_token_response.status_code}. Tweet url: {tweet_url}"
+    )
 
     guest_token = guest_token_response.json()["guest_token"]
 
-    assert (
-        guest_token is not None
-    ), f"Failed to find guest token. If you are using the correct Twitter URL this suggests a bug in the script. Please open a GitHub issue and copy and paste this message. Tweet url: {tweet_url}, main.js url: {mainjs_url}"
+    assert guest_token is not None, (
+        f"Failed to find guest token. Tweet url: {tweet_url}, main.js url: {mainjs_url}"
+    )
 
     return bearer_token, guest_token
 
@@ -184,9 +210,9 @@ def get_details_url(tweet_id, features, variables):
 def get_tweet_details(tweet_url, guest_token, bearer_token):
     tweet_id = re.findall(r"(?<=status/)\d+", tweet_url)
 
-    assert (
-        tweet_id is not None and len(tweet_id) == 1
-    ), f"Could not parse tweet id from your url.  Make sure you are using the correct url.  If you are, then file a GitHub issue and copy and paste this message.  Tweet url: {tweet_url}"
+    assert tweet_id is not None and len(tweet_id) == 1, (
+        f"Could not parse tweet id from your url.  Make sure you are using the correct url.  If you are, then file a GitHub issue and copy and paste this message.  Tweet url: {tweet_url}"
+    )
 
     tweet_id = tweet_id[0]
 
@@ -211,11 +237,13 @@ def get_tweet_details(tweet_url, guest_token, bearer_token):
         try:
             error_json = json.loads(details.text)
         except json.JSONDecodeError:
-            assert False, f"Failed to parse json from details error. details text: {details.text}  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Status code: {details.status_code}.  Tweet url: {tweet_url}"
+            assert False, (
+                f"Failed to parse json from details error. details text: {details.text}  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Status code: {details.status_code}.  Tweet url: {tweet_url}"
+            )
 
-        assert (
-            "errors" in error_json
-        ), f"Failed to find errors in details error json.  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Status code: {details.status_code}.  Tweet url: {tweet_url}"
+        assert "errors" in error_json, (
+            f"Failed to find errors in details error json.  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Status code: {details.status_code}.  Tweet url: {tweet_url}"
+        )
 
         needed_variable_pattern = re.compile(r"Variable '([^']+)'")
         needed_features_pattern = re.compile(
@@ -257,9 +285,9 @@ def get_tweet_details(tweet_url, guest_token, bearer_token):
             with open(request_details_file, "w") as f:
                 json.dump(request_details, f, indent=4)
 
-    assert (
-        details.status_code == 200
-    ), f"Failed to get tweet details.  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Status code: {details.status_code}.  Tweet url: {tweet_url}"
+    assert details.status_code == 200, (
+        f"Failed to get tweet details.  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Status code: {details.status_code}.  Tweet url: {tweet_url}"
+    )
 
     return details
 
@@ -374,9 +402,9 @@ def download_parts(url, output_filename):
             max_res = res
             max_res_url = url
 
-    assert (
-        max_res_url is not None
-    ), f"Could not find a url to download from.  Make sure you are using the correct url.  If you are, then file a GitHub issue and copy and paste this message.  Tweet url: {url}"
+    assert max_res_url is not None, (
+        f"Could not find a url to download from.  Make sure you are using the correct url.  If you are, then file a GitHub issue and copy and paste this message.  Tweet url: {url}"
+    )
 
     video_part_prefix = "https://video.twimg.com"
 
@@ -385,9 +413,9 @@ def download_parts(url, output_filename):
     mp4_pattern = re.compile(r"(/[^\n]*\.mp4)")
     mp4_parts = mp4_pattern.findall(resp.text)
 
-    assert (
-        len(mp4_parts) == 1
-    ), f"There should be exactly 1 mp4 container at this point.  Instead, found {len(mp4_parts)}.  Please open a GitHub issue and copy and paste this message into it.  Tweet url: {url}"
+    assert len(mp4_parts) == 1, (
+        f"There should be exactly 1 mp4 container at this point.  Instead, found {len(mp4_parts)}.  Please open a GitHub issue and copy and paste this message into it.  Tweet url: {url}"
+    )
 
     mp4_url = video_part_prefix + mp4_parts[0]
 
@@ -522,9 +550,9 @@ def download_video(tweet_url, output_file, target_all_videos=False):
         if original_url:
             download_video(original_url, output_file)
         else:
-            assert (
-                len(mp4s) > 0
-            ), f"Could not find any mp4s to download.  Make sure you are using the correct url.  If you are, then file a GitHub issue and copy and paste this message.  Tweet url: {tweet_url}"
+            assert len(mp4s) > 0, (
+                f"Could not find any mp4s to download.  Make sure you are using the correct url.  If you are, then file a GitHub issue and copy and paste this message.  Tweet url: {tweet_url}"
+            )
 
             mp4 = mp4s[0]
             if "container" in mp4:
@@ -825,7 +853,9 @@ def download_videos(video_urls, output_file, output_folder_path, gif_ptn):
 
 def download_video_for_sc(tweet_url, output_file="", output_folder_path="./output"):
     delete_debug_log(debug_option)
-    bearer_token, guest_token = get_tokens(tweet_url)
+    bearer_token, guest_token = get_tokens(
+        tweet_url.replace("https://twitter.com", "https://x.com")
+    )
     resp = get_tweet_details(tweet_url, guest_token, bearer_token)
     video_urls, gif_ptn, img_urls = create_video_urls(resp.text)
     if image_save_option:

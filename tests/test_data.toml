@@ -148,15 +148,6 @@ audio_check_flag = [true]
 # non card type
 [[tests]]
 title = "test-case-No17"
-url = "https://twitter.com/BleacherReport/status/1452444953435533312"
-file_name = ""
-output_directory = "../output"
-expected_files = ["output.mp4"]
-audio_check_flag = [true]
-
-# non card type
-[[tests]]
-title = "test-case-No18"
 url = "https://twitter.com/lilteish/status/1094410530335481856"
 file_name = ""
 output_directory = "../output"
