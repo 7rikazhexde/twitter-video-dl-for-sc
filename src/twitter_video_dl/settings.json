@@ -7,7 +7,7 @@
     "loglevel": "error"
   },
   "image":{
-    "save_option": true
+    "save_option": false
   },
-  "debug_option": true
+  "debug_option": false
 }
