@@ -147,7 +147,7 @@ def get_tokens(tweet_url):
 
     # Find main.js URL
     mainjs_urls = re.findall(
-        r"https://abs\.twimg\.com/responsive-web/client-web-legacy/main\.[^\.]+\.js",
+        r"https://abs\.twimg\.com/responsive-web/client-web(?:-legacy)?/main\.[^\.]+\.js",
         response.text,
     )
 
@@ -573,30 +573,57 @@ def create_video_urls(json_data):
     gif_ptn = False
     media_list = None
 
+    # デバッグ: JSONデータの構造を確認
+    if debug_option:
+        debug_write_log(f"JSON data keys: {data.keys()}", debug_option)
+        if "data" in data:
+            debug_write_log(f"data keys: {data['data'].keys()}", debug_option)
+            if "tweetResult" in data["data"]:
+                debug_write_log(
+                    f"tweetResult keys: {data['data']['tweetResult'].keys()}",
+                    debug_option,
+                )
+
     try:
         media_list = data["data"]["tweetResult"]["result"]["card"]["legacy"][
             "binding_values"
         ]
-    except KeyError:
-        pass
+        debug_write_log(
+            f"Found media_list in card binding_values: {media_list}", debug_option
+        )
+    except KeyError as e:
+        debug_write_log(f"KeyError in card binding_values: {e}", debug_option)
 
     try:
         media_list = data["data"]["tweetResult"]["result"]["legacy"]["entities"][
             "media"
         ]
-    except KeyError:
-        pass
+        debug_write_log(
+            f"Found media_list in entities media: {media_list}", debug_option
+        )
+    except KeyError as e:
+        debug_write_log(f"KeyError in entities media: {e}", debug_option)
 
     if media_list is None:
         try:
             media_list = data["data"]["tweetResult"]["result"]["legacy"][
                 "extended_entities"
             ]["media"]
-        except KeyError:
-            pass
+            debug_write_log(
+                f"Found media_list in extended_entities: {media_list}", debug_option
+            )
+        except KeyError as e:
+            debug_write_log(f"KeyError in extended_entities: {e}", debug_option)
+
+    # デバッグ: media_listの最終状態
+    debug_write_log(f"Final media_list: {media_list}", debug_option)
 
     img_urls = []
-    img_urls = get_img_url(media_list)
+    # None チェックを追加
+    if media_list is not None:
+        img_urls = get_img_url(media_list)
+    else:
+        debug_write_log("media_list is None, skipping image extraction", debug_option)
 
     if media_list:
         if "video_info" in media_list[0]:
@@ -609,12 +636,19 @@ def create_video_urls(json_data):
             video_url_list = get_card_type_vid_url(media_list)
     else:
         video_url_list = []
+        debug_write_log("No video found in media_list", debug_option)
 
     return video_url_list, gif_ptn, img_urls
 
 
 def get_img_url(media_list):
     img_urls = []
+
+    # None チェック
+    if media_list is None:
+        debug_write_log("media_list is None in get_img_url", debug_option)
+        return img_urls
+
     for media in media_list:
         media_url = media.get("media_url_https")
         media_type = media.get("type")
@@ -624,6 +658,8 @@ def get_img_url(media_list):
             and media_type == "photo"
         ):
             img_urls.append(media_url)
+
+    debug_write_log(f"Found {len(img_urls)} images", debug_option)
     return img_urls
 
 
