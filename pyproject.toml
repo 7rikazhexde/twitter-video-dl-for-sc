@@ -1,43 +1,46 @@
-[tool.poetry]
-authors = ["7rikazhexde"]
-description = "This project is based on the original code of the [inteoryx / twitter-video-dl](https://github.com/inteoryx/twitter-video-dl) project, which allows users to download Twitter videos as MP4 files using Python, FFmpeg and URLs without the need for API keys. I forked this project for use in iOS Shortcuts application."
-license = "Unlicense"
+# Project basic configuration (uv-based)
+# Project metadata compliant with PEP 621
+[project]
 name = "twitter-video-dl-for-sc"
-readme = "README.md"
 version = "0.2.11"
-package-mode = false
+description = "This project is based on the original code of the inteoryx/twitter-video-dl project, which allows users to download Twitter videos as MP4 files using Python, FFmpeg and URLs without the need for API keys. I forked this project for use in iOS Shortcuts application."
+authors = [
+    {name = "7rikazhexde", email = "33836132+7rikazhexde@users.noreply.github.com"}
+]
+license = {text = "Unlicense"}
+readme = "README.md"
+requires-python = ">=3.11.0"
+dependencies = [
+    "requests>=2.31.0",
+]
 
-[tool.poetry.dependencies]
-python = "^3.11.0"
-requests = "^2.31.0"
+# Development dependencies
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.13.3",
+    "ffmpeg-python>=0.2.0",
+    "pre-commit>=3.4.0",
+    "tomlkit>=0.12.1",
+    "pytest>=7.4.3",
+    "pytest-mock>=3.12.0",
+]
 
-[tool.poetry.group.dev.dependencies]
-ruff = "^0.0.292"
-taskipy = "^1.12.0"
-ffmpeg-python = "^0.2.0"
-pre-commit = "^3.4.0"
-tomlkit = "^0.12.1"
-pytest = "^7.4.3"
-pytest-mock = "^3.12.0"
-pytest-cov = "^4.1.0"
-pytest-html = "^4.1.1"
-pytest-xdist = "^3.5.0"
+# Project URL links
+[project.urls]
+Homepage = "https://github.com/7rikazhexde/twitter-video-dl-for-sc"
+Repository = "https://github.com/7rikazhexde/twitter-video-dl-for-sc.git"
 
-[tool.taskipy.tasks]
-# poetry run task [task]
-blackfix = "poetry run black twitter-video-dl-for-sc.py twitter-video-dl.py src tests ci"
-ruffcheck = "poetry run ruff twitter-video-dl-for-sc.py twitter-video-dl.py src tests ci"
-rufffix = "poetry run ruff twitter-video-dl-for-sc.py twitter-video-dl.py src tests ci --fix"
+# Build system configuration
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.black]
-target-version = ['py310']
+# Hatchling configuration (package structure specification)
+[tool.hatch.build.targets.wheel]
+packages = ["src/twitter_video_dl"]
 
+# Ruff configuration
 [tool.ruff]
-# Check Rules
-lint.select = ["E", "F", "I"]
-# Ignore Error
-lint.ignore = ["E402","E501"]
-# Exclude a variety of commonly ignored directories.
 exclude = [
     ".bzr",
     ".direnv",
@@ -60,15 +63,18 @@ exclude = [
     "dist",
     "node_modules",
     "venv",
+    "browser_extension",
+    "demo",
+    "output",
 ]
-lint.per-file-ignores = {}
+target-version = "py311"
 
-# Assume Python 3.10.
-target-version = "py310"
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E402", "E501"]
+per-file-ignores = {}
 
-[build-system]
-requires = [
-    "setuptools",
-    "requests>2.27.0"
-]
-build-backend = "setuptools.build_meta"
+# Pytest configuration
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [".", "src"]

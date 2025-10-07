@@ -3,7 +3,7 @@ fail_fast: true
 # A list of repository mappings
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v5.0.0
+    rev: v6.0.0
     hooks:
       # Remove spaces at end of lines except markdown
       - id: trailing-whitespace
@@ -18,26 +18,26 @@ repos:
       # yaml syntax check
       - id: check-yaml
 
-  # https://python-poetry.org/docs/pre-commit-hooks/#usage
-  - repo: https://github.com/python-poetry/poetry
-    rev: 1.8.0
-    hooks:
-      - id: poetry-check
-        verbose: true
-      - id: poetry-lock
-        verbose: true
-      - id: poetry-export
-        args: ["-f", "requirements.txt", "-o", "requirements.txt", "--without-hashes"]
-        verbose: true
-        files: ^pyproject\.toml$
-      - id: poetry-export
-        args: ["--with", "dev", "-f", "requirements.txt", "-o", "requirements-dev.txt", "--without-hashes"]
-        verbose: true
-        files: ^pyproject\.toml$
-
-  - repo: https://github.com/charliermarsh/ruff-pre-commit
-    rev: v0.9.9
+  # Ruff linter and formatter
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
     hooks:
       - id: ruff
-        args: [ --fix ]
+        args: [--fix]
       - id: ruff-format
+
+  # uv pip compile to generate requirements files
+  - repo: local
+    hooks:
+      - id: uv-export
+        name: uv export requirements.txt
+        entry: bash -c 'uv pip compile pyproject.toml -o requirements.txt --no-deps'
+        language: system
+        files: ^pyproject\.toml$
+        pass_filenames: false
+      - id: uv-export-dev
+        name: uv export requirements-dev.txt
+        entry: bash -c 'uv pip compile pyproject.toml --extra dev -o requirements-dev.txt'
+        language: system
+        files: ^pyproject\.toml$
+        pass_filenames: false

@@ -12,9 +12,15 @@ This project is based on the original code of the [inteoryx / twitter-video-dl](
   - [Usage](#usage)
     - [Installing FFmpeg](#installing-ffmpeg)
     - [For Shortcuts](#for-shortcuts)
-  - [For Mac Browser](#for-mac-browser)
-  - [For Browser Extension](#for-browser-extension)
-  - [CLI For Windows / Mac / Linux](#cli-for-windows--mac--linux)
+    - [For Mac Browser](#for-mac-browser)
+    - [For Browser Extension](#for-browser-extension)
+    - [CLI For Windows / Mac / Linux](#cli-for-windows--mac--linux)
+  - [Development](#development)
+    - [Prerequisites](#prerequisites)
+    - [Setup Development Environment](#setup-development-environment)
+      - [Option 1: Using uv (Recommended)](#option-1-using-uv-recommended)
+      - [Option 2: Using pip and venv](#option-2-using-pip-and-venv)
+    - [Development Commands](#development-commands)
   - [Auto Retry Feature](#auto-retry-feature)
   - [Other](#other)
   - [Test-Environment For twitter-video-dl-for-sc](#test-environment-for-twitter-video-dl-for-sc)
@@ -80,7 +86,7 @@ ffmpeg version 6.0 Copyright (c) 2000-2023 the FFmpeg developers
    - If you do not specify an output file name, the file name is after the user _ id in the URL.
    - Replace '/' with '-' in the file name and new line ith '_'.
 
-## For Mac Browser
+### For Mac Browser
 
 Only differences from the procedure for iPhone and iPad are described.
 
@@ -90,7 +96,7 @@ Only differences from the procedure for iPhone and iPad are described.
 
 2. When executing the shortcut, start **the video-posted post in the browser** that you start on your Mac, and then execute ***twitter-video-dl-sc-for-mac-browser*** from the tab Sharing. If it saves successfully, the destination will be displayed. ([See demo video](#demo-shortcuts-for-mac-browser))
 
-## For Browser Extension
+### For Browser Extension
 
 > [!WARNING]
 > **Browsers that have been tested are chrome and brave.**
@@ -100,31 +106,271 @@ Only differences from the procedure for iPhone and iPad are described.
 
 1. extensions > load unpackaged extensions > Local Package
    **[twitter-video-dl-send](./browser_extension/twitter-video-dl-send/)**
-2. Start the server (`poetry run python twitter-video-dl-server.py`)
+2. Start the server
+   - **With uv**: `uv run python twitter-video-dl-server.py`
+   - **Without uv**: `python twitter-video-dl-server.py`
 3. Open the X(Twitter) web page where the video was posted.
 4. Specify the filename and URL (not required) in the extension and run the process of saving the video
 5. If there are no errors, the video will be saved in the **output** folder
 
-## CLI For Windows / Mac / Linux
+### CLI For Windows / Mac / Linux
 
 > [!NOTE]
 > **[Partially the same as twitter-video-dl and depends on it.](https://github.com/inteoryx/twitter-video-dl)**  
 
-1. Clone the repo and pip install -r requirements.txt (just the requests library)
+<details>
+<summary><b>Option 1: Using uv (Recommended)</b></summary>
+
+1. Clone the repo and install dependencies:
+
+   ```bash
+   # Clone the repository
+   git clone https://github.com/7rikazhexde/twitter-video-dl-for-sc.git
+   cd twitter-video-dl-for-sc
+
+   # Install uv (if not already installed)
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+
+   # Install dependencies
+   uv sync
+   ```
+
 2. See a video on twitter that you want to save.
+
 3. Invoke the script, e.g.:
 
-```bash
-# File name specified
-python twitter-video-dl-for-sc.py https://twitter.com/i/status/1650804112987136000 output_file_name
-```
+   ```bash
+   # File name specified
+   uv run python twitter-video-dl-for-sc.py https://twitter.com/i/status/1650804112987136000 output_file_name
+   ```
 
-```bash
-# Without file name
-python twitter-video-dl-for-sc.py https://twitter.com/i/status/1650804112987136000 ""
-```
+   ```bash
+   # Without file name
+   uv run python twitter-video-dl-for-sc.py https://twitter.com/i/status/1650804112987136000 ""
+   ```
+
+</details>
+
+<details>
+<summary><b>Option 2: Using pip and venv</b></summary>
+
+1. Clone the repo and install dependencies:
+
+   ```bash
+   # Clone the repository
+   git clone https://github.com/7rikazhexde/twitter-video-dl-for-sc.git
+   cd twitter-video-dl-for-sc
+
+   # Create virtual environment
+   python -m venv .venv
+
+   # Activate virtual environment
+   # On Linux/macOS:
+   source .venv/bin/activate
+   # On Windows:
+   # .venv\Scripts\activate
+
+   # Install dependencies
+   pip install -r requirements.txt
+   ```
+
+2. See a video on twitter that you want to save.
+
+3. Invoke the script, e.g.:
+
+   ```bash
+   # File name specified
+   python twitter-video-dl-for-sc.py https://twitter.com/i/status/1650804112987136000 output_file_name
+   ```
+
+   ```bash
+   # Without file name
+   python twitter-video-dl-for-sc.py https://twitter.com/i/status/1650804112987136000 ""
+   ```
+
+</details>
 
 Done, now you should have an mp4 file of the highest bitrate version of that video available.
+
+## Development
+
+This project uses [uv](https://github.com/astral-sh/uv) for dependency management and [just](https://github.com/casey/just) as a command runner.
+
+### Prerequisites
+
+- Python 3.11 or higher
+- FFmpeg (for video processing)
+- **Recommended**: [uv](https://github.com/astral-sh/uv) - Fast Python package installer and resolver
+- **Optional**: [just](https://github.com/casey/just) - Command runner
+
+### Setup Development Environment
+
+#### Option 1: Using uv (Recommended)
+
+1. **Install uv**:
+
+   ```bash
+   # macOS/Linux
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+
+   # Windows
+   powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+   # Or with pip
+   pip install uv
+   ```
+
+2. **Install just** (optional, but recommended):
+
+   ```bash
+   # macOS
+   brew install just
+
+   # Linux
+   curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/bin
+
+   # Or with cargo
+   cargo install just
+   ```
+
+3. **Setup the project**:
+
+   ```bash
+   # Clone the repository
+   git clone https://github.com/7rikazhexde/twitter-video-dl-for-sc.git
+   cd twitter-video-dl-for-sc
+
+   # If you have just installed
+   just setup
+
+   # Or manually with uv
+   uv sync --extra dev
+   uv run pre-commit install
+   ```
+
+#### Option 2: Using pip and venv
+
+1. **Clone the repository**:
+
+   ```bash
+   git clone https://github.com/7rikazhexde/twitter-video-dl-for-sc.git
+   cd twitter-video-dl-for-sc
+   ```
+
+2. **Create and activate virtual environment**:
+
+   ```bash
+   # Create virtual environment
+   python -m venv .venv
+
+   # Activate virtual environment
+   # On Linux/macOS:
+   source .venv/bin/activate
+   # On Windows:
+   # .venv\Scripts\activate
+   ```
+
+3. **Install dependencies**:
+
+   ```bash
+   # Install development dependencies
+   pip install -r requirements-dev.txt
+
+   # Install pre-commit hooks
+   pre-commit install
+   ```
+
+### Development Commands
+
+<details>
+<summary><b>Using just (with uv)</b></summary>
+
+If you have `just` installed, you can use these convenient commands:
+
+```bash
+# Show all available commands
+just
+
+# Code quality checks
+just ruffcheck          # Check code with ruff
+just rufffix            # Fix code issues automatically
+just format             # Format code
+
+# Testing
+just test               # Run tests
+
+# Environment management
+just install            # Install all dependencies
+just update             # Update dependencies
+just show-outdated      # Check for outdated packages
+just clean              # Clean up generated files
+
+# Pre-commit hooks
+just pre-commit         # Run pre-commit hooks on all files
+
+# Version management
+just update-version 0.2.12        # Update version
+just prepare-release 0.2.12       # Prepare for release
+
+# Debug
+just debug-info         # Show debug information
+just help               # Show detailed help
+```
+
+</details>
+
+<details>
+<summary><b>Using uv directly (without just)</b></summary>
+
+If you don't have `just` installed, you can use `uv` directly:
+
+```bash
+# Code quality
+uv run ruff check twitter-video-dl-for-sc.py twitter-video-dl.py src tests ci
+uv run ruff check twitter-video-dl-for-sc.py twitter-video-dl.py src tests ci --fix
+uv run ruff format twitter-video-dl-for-sc.py twitter-video-dl.py src tests ci
+
+# Testing
+uv run pytest tests/
+
+# Pre-commit
+uv run pre-commit run --all-files
+
+# Update dependencies
+uv lock --upgrade
+uv sync --extra dev
+```
+
+</details>
+
+<details>
+<summary><b>Using pip and venv (without uv)</b></summary>
+
+If you're using traditional pip and venv setup:
+
+```bash
+# Activate virtual environment first (if not already activated)
+# Linux/macOS:
+source .venv/bin/activate
+# Windows:
+# .venv\Scripts\activate
+
+# Code quality
+ruff check twitter-video-dl-for-sc.py twitter-video-dl.py src tests ci
+ruff check twitter-video-dl-for-sc.py twitter-video-dl.py src tests ci --fix
+ruff format twitter-video-dl-for-sc.py twitter-video-dl.py src tests ci
+
+# Testing
+pytest tests/
+
+# Pre-commit
+pre-commit run --all-files
+
+# Update dependencies
+pip install --upgrade -r requirements-dev.txt
+```
+
+</details>
 
 ## Auto Retry Feature
 
@@ -149,5 +395,5 @@ twitter-video-dl-for-sc uses ffmpeg for saving videos. Therefore, we provide a t
 If you get an error with the specified URL, please register an issue. If you want to test individually, you can test in advance by adding the URL of the post where the video was posted to [test_data.toml](./tests/test_data.toml).
 
 > [!NOTE]
-> **- The test environment depends on **pytest**, which is added as part of the dev environment dependency files with the `poetry install` command.**  
-> **- You can run the test command in `poetry run pytest --html=pytest-html/report.html`.**
+> **Testing with uv**: `uv sync --extra dev` then `uv run pytest` or `just test`  
+> **Testing with pip**: `pip install -r requirements-dev.txt` then `pytest tests/`
