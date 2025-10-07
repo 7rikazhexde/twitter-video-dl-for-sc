@@ -397,3 +397,6 @@ If you get an error with the specified URL, please register an issue. If you wan
 > [!NOTE]
 > **Testing with uv**: `uv sync --extra dev` then `uv run pytest` or `just test`  
 > **Testing with pip**: `pip install -r requirements-dev.txt` then `pytest tests/`
+
+> [!IMPORTANT]
+> When running full tests with `just test`, ensure that the `"save_option"` of the `"image"` key in [settings.json](./src/twitter_video_dl/settings.json) is set to `true`.

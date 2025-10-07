@@ -1,8 +1,12 @@
 title = "Test file(TOML) for twitter-video-dl-for-sc"
 
-# Definition rules
-# Create a video table and fill in "url" and "audio_check_flag" as a set.
-# Specify false for ".gif" and true for ".mp4".
+# Definition rules:
+#  Create a video table and fill in "url" and "audio_check_flag" as a set.
+#  Specify false for ".gif" and true for ".mp4".
+#
+# Note:
+#  When running tests, ensure that the "save_option" of the "image" key
+#  in settings.json is set to true to properly test image and video mixed posts.
 
 [[tests]]
 title = "test-case-No1"
