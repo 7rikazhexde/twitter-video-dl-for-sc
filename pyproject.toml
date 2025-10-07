@@ -2,7 +2,7 @@
 # Project metadata compliant with PEP 621
 [project]
 name = "twitter-video-dl-for-sc"
-version = "0.2.12"
+version = "0.2.13"
 description = "This project is based on the original code of the inteoryx/twitter-video-dl project, which allows users to download Twitter videos as MP4 files using Python, FFmpeg and URLs without the need for API keys. I forked this project for use in iOS Shortcuts application."
 authors = [
     {name = "7rikazhexde", email = "33836132+7rikazhexde@users.noreply.github.com"}
