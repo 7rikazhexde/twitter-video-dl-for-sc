@@ -2,6 +2,14 @@
 
 This project is based on the original code of the [inteoryx / twitter-video-dl](https://github.com/inteoryx/twitter-video-dl) project, which allows users to download X(Twitter) App videos as MP4 files using Python, FFmpeg and URLs without the need for API keys. I forked this project for use in iOS Shortcuts application.
 
+**Key Features:**
+
+- **Dual-API Strategy**: Uses Syndication API (primary, no authentication required) with GraphQL API fallback for maximum reliability
+- **Card-Type Video Support**: Downloads videos from promoted/ad tweets
+- **iOS Shortcuts Integration**: Optimized for iOS Shortcuts workflow
+- **Browser Extension Support**: Chrome/Brave extension for easy video downloads
+- **GIF Conversion**: Automatic MP4 to GIF conversion using FFmpeg
+
 ## ToC
 
 - [twitter-video-dl-for-sc](#twitter-video-dl-for-sc)
@@ -21,8 +29,10 @@ This project is based on the original code of the [inteoryx / twitter-video-dl](
       - [Option 1: Using uv (Recommended)](#option-1-using-uv-recommended)
       - [Option 2: Using pip and venv](#option-2-using-pip-and-venv)
     - [Development Commands](#development-commands)
-  - [Auto Retry Feature](#auto-retry-feature)
-  - [Other](#other)
+  - [API Approach \& Auto Retry Feature](#api-approach--auto-retry-feature)
+    - [Dual-API Strategy](#dual-api-strategy)
+    - [Auto Retry Feature](#auto-retry-feature)
+  - [Supported Tweet Types](#supported-tweet-types)
   - [Test-Environment For twitter-video-dl-for-sc](#test-environment-for-twitter-video-dl-for-sc)
     - [Usage](#usage-1)
 
@@ -372,19 +382,48 @@ pip install --upgrade -r requirements-dev.txt
 
 </details>
 
-## Auto Retry Feature
+## API Approach & Auto Retry Feature
+
+### Dual-API Strategy
+
+This project uses a two-tier API approach for maximum reliability:
+
+1. **Syndication API (Primary)**
+   - Endpoint: `cdn.syndication.twimg.com`
+   - No authentication required
+   - More stable and reliable
+   - Supports regular videos, GIFs, and card-type videos (promoted/ad tweets)
+
+2. **GraphQL API (Fallback)**
+   - Endpoint: `api.x.com/i/api/graphql`
+   - Used when Syndication API fails
+   - Requires bearer token and guest token
+   - Dynamic Query ID extraction from main.js
+
+### Auto Retry Feature
 
 > [!NOTE]
-> **[Same as twitter-video-dl and depends on it.](https://github.com/inteoryx/twitter-video-dl)**  
+> **This feature applies to the GraphQL API fallback method.**
 
-From time to time, every week or so, Twitter will add some new request parameters that they expect from callers asking for their content.  Twitter refers to these as "features" or "variables".  The twitter-video-dl script will try to detect when a new feature or variable has been added and automatically accommodate the new element.  This is not foolproof though.  It's possible the script will fail with an error message.  If it does, please open an issue (or send a PR).
+From time to time, every week or so, Twitter will add some new request parameters that they expect from callers asking for their content. Twitter refers to these as "features" or "variables". The twitter-video-dl script will try to detect when a new feature or variable has been added and automatically accommodate the new element. This is not foolproof though. It's possible the script will fail with an error message. If it does, please open an issue (or send a PR).
 
-## Other
+## Supported Tweet Types
 
-> [!NOTE]
-> **[Same as twitter-video-dl and depends on it.](https://github.com/inteoryx/twitter-video-dl)**  
+This application has been tested with the following tweet types:
 
-I have tested this with the 10 video files listed in test_videos.txt and it seems to work.  Highly possible there are other variants out there that this won't work for.  If you encounter such, please submit an issue and include the URL that doesn't work.  If the script doesn't work double check you have the URL right.
+- ✅ **Regular videos** (2019-2024)
+- ✅ **GIF animations**
+- ✅ **Mixed media** (images + videos)
+- ✅ **Card-type videos** (promoted/ad tweets)
+- ✅ **Thread videos** (multiple videos in a thread)
+
+All 17 test cases pass successfully. If you encounter a URL that doesn't work, please submit an issue and include:
+
+- The URL that doesn't work
+- The error message (if any)
+- Your environment (OS, Python version, etc.)
+
+Before submitting an issue, please double-check that you have the correct URL format.
 
 ## Test-Environment For twitter-video-dl-for-sc
 

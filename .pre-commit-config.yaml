@@ -26,6 +26,14 @@ repos:
         args: [--fix]
       - id: ruff-format
 
+  # Reference: https://github.com/DavidAnson/markdownlint-cli2#overview
+  # > markdownlint-cli is a traditional command-line interface for markdownlint.
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.45.0
+    hooks:
+      - id: markdownlint
+        args: ["--config", ".markdownlint.jsonc"]
+
   # uv pip compile to generate requirements files
   - repo: local
     hooks:

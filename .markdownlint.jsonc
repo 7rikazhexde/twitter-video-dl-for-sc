@@ -1,0 +1,8 @@
+{
+  "MD013": false, // Line length / 行の長さ
+  "MD024": false, // Multiple headings with the same content / 同じ内容の複数の見出し
+  "MD025": false, // Multiple top-level headings in the same document / 同じドキュメント内の複数のトップレベルの見出し
+  "MD026": false, // Trailing punctuation in heading / 見出しの末尾の句読点
+  "MD028": false, // Blank line inside blockquote / ブロッククオート内の空白行
+  "MD033": false // Inline HTML / raw HTMLの記入
+}
