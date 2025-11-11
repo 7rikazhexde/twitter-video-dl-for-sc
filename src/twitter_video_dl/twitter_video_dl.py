@@ -179,35 +179,61 @@ def get_tokens(tweet_url):
     if bearer_token.startswith("Bearer "):
         bearer_token = bearer_token.replace("Bearer ", "")
 
-    session.headers.update({"authorization": f"Bearer {bearer_token}"})
-    guest_token_response = session.post(
-        "https://api.twitter.com/1.1/guest/activate.json"
-    )
+    # Extract TweetResultByRestId GraphQL query ID from main.js
+    # Pattern: TweetResultByRestId:{queryId:"<ID>",operationName:"TweetResultByRestId",...}
+    query_id_pattern = r'TweetResultByRestId.*?queryId:"([^"]+)"'
+    query_id_match = re.search(query_id_pattern, mainjs.text)
 
-    debug_write_log(guest_token_response.text, debug_option)
+    if query_id_match:
+        tweet_detail_query_id = query_id_match.group(1)
+        debug_write_log(
+            f"Found TweetResultByRestId query ID: {tweet_detail_query_id}", debug_option
+        )
+    else:
+        # Fallback to old query ID if not found
+        tweet_detail_query_id = "0hWvDhmW8YQ-S_ib3azIrw"
+        debug_write_log(
+            f"Using fallback query ID: {tweet_detail_query_id}", debug_option
+        )
+
+    # Extract guest token from the HTML response (from gt cookie)
+    # The guest token is set in a cookie via JavaScript: document.cookie="gt=<token>; ..."
+    gt_match = re.search(r'document\.cookie="gt=(\d+);', response.text)
+
+    if gt_match:
+        guest_token = gt_match.group(1)
+        debug_write_log(f"Found guest token from cookie: {guest_token}", debug_option)
+    else:
+        # Fallback: Try the old API endpoint
+        session.headers.update({"authorization": f"Bearer {bearer_token}"})
+        guest_token_response = session.post("https://api.x.com/1.1/guest/activate.json")
+
+        debug_write_log(guest_token_response.text, debug_option)
+
+        assert (
+            guest_token_response.status_code == 200
+        ), f"Failed to activate guest token. Status code: {guest_token_response.status_code}. Tweet url: {tweet_url}"
+
+        guest_token = guest_token_response.json()["guest_token"]
 
     assert (
-        guest_token_response.status_code == 200
-    ), f"Failed to activate guest token. Status code: {guest_token_response.status_code}. Tweet url: {tweet_url}"
-
-    guest_token = guest_token_response.json()["guest_token"]
-
-    assert (
-        guest_token is not None
+        guest_token is not None and len(guest_token) > 0
     ), f"Failed to find guest token. Tweet url: {tweet_url}, main.js url: {mainjs_url}"
 
-    return bearer_token, guest_token
+    return bearer_token, guest_token, tweet_detail_query_id
 
 
-def get_details_url(tweet_id, features, variables):
+def get_details_url(tweet_id, features, variables, query_id="0hWvDhmW8YQ-S_ib3azIrw"):
     # create a copy of variables - we don't want to modify the original
     variables = {**variables}
     variables["tweetId"] = tweet_id
 
-    return f"https://twitter.com/i/api/graphql/0hWvDhmW8YQ-S_ib3azIrw/TweetResultByRestId?variables={urllib.parse.quote(json.dumps(variables))}&features={urllib.parse.quote(json.dumps(features))}"
+    return f"https://x.com/i/api/graphql/{query_id}/TweetResultByRestId?variables={urllib.parse.quote(json.dumps(variables))}&features={urllib.parse.quote(json.dumps(features))}"
 
 
-def get_tweet_details(tweet_url, guest_token, bearer_token):
+def get_tweet_details(
+    tweet_url, guest_token, bearer_token, query_id="0hWvDhmW8YQ-S_ib3azIrw"
+):
     tweet_id = re.findall(r"(?<=status/)\d+", tweet_url)
 
     assert (
@@ -217,19 +243,35 @@ def get_tweet_details(tweet_url, guest_token, bearer_token):
     tweet_id = tweet_id[0]
 
     # the url needs a url encoded version of variables and features as a query string
-    url = get_details_url(tweet_id, features, variables)
+    url = get_details_url(tweet_id, features, variables, query_id)
 
     details = requests.get(
         url,
         headers={
             "authorization": f"Bearer {bearer_token}",
             "x-guest-token": guest_token,
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0",
+            "Accept": "*/*",
+            "Accept-Language": "en-US, en, *;q=0.5",
+            "Accept-Encoding": "gzip, deflate, br",
+            "Content-Type": "application/json",
         },
     )
 
-    debug_write_log(
-        json.dumps(json.loads(details.text), indent=2, ensure_ascii=False), debug_option
-    )
+    # Log response status and try to parse JSON
+    debug_write_log(f"Response status: {details.status_code}", debug_option)
+    debug_write_log(f"Response headers: {details.headers}", debug_option)
+
+    try:
+        json_response = json.loads(details.text)
+        debug_write_log(
+            json.dumps(json_response, indent=2, ensure_ascii=False), debug_option
+        )
+    except json.JSONDecodeError as e:
+        debug_write_log(f"Failed to parse JSON: {e}", debug_option)
+        debug_write_log(
+            f"Response text (first 1000 chars): {details.text[:1000]}", debug_option
+        )
 
     max_retries = 10
     cur_retry = 0
@@ -258,20 +300,33 @@ def get_tweet_details(tweet_url, guest_token, bearer_token):
                 for feature in nf.split(","):
                     features[feature.strip()] = True
 
-        url = get_details_url(tweet_id, features, variables)
+        url = get_details_url(tweet_id, features, variables, query_id)
 
         details = requests.get(
             url,
             headers={
                 "authorization": f"Bearer {bearer_token}",
                 "x-guest-token": guest_token,
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0",
+                "Accept": "*/*",
+                "Accept-Language": "en-US, en, *;q=0.5",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Content-Type": "application/json",
             },
         )
 
-        debug_write_log(
-            json.dumps(json.loads(details.text), indent=2, ensure_ascii=False),
-            debug_option,
-        )
+        # Try to log the response
+        try:
+            json_response = json.loads(details.text)
+            debug_write_log(
+                json.dumps(json_response, indent=2, ensure_ascii=False),
+                debug_option,
+            )
+        except json.JSONDecodeError as e:
+            debug_write_log(f"Failed to parse JSON in retry: {e}", debug_option)
+            debug_write_log(
+                f"Response text (first 1000 chars): {details.text[:1000]}", debug_option
+            )
 
         cur_retry += 1
 
@@ -301,6 +356,154 @@ def get_tweet_status_id(tweet_url):
         exit()
     status_id = match[0]
     return status_id
+
+
+def get_tweet_details_syndication(tweet_url):
+    """
+    Use Twitter's Syndication API and fallback methods to get tweet details.
+    This API doesn't require authentication and is more stable.
+    """
+    tweet_id = re.findall(r"(?<=status/)\d+", tweet_url)
+
+    assert (
+        tweet_id is not None and len(tweet_id) == 1
+    ), f"Could not parse tweet id from your url. Tweet url: {tweet_url}"
+
+    tweet_id = tweet_id[0]
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0",
+        "Accept": "*/*",
+        "Accept-Language": "en-US, en, *;q=0.5",
+    }
+
+    # Try multiple API endpoints
+    api_urls = [
+        f"https://cdn.syndication.twimg.com/tweet-result?id={tweet_id}&lang=en&token=0",
+        f"https://cdn.syndication.twimg.com/tweet-result?id={tweet_id}",
+        f"https://syndication.twitter.com/srv/timeline-profile/screen-name/x?tweet_id={tweet_id}",
+    ]
+
+    for api_url in api_urls:
+        debug_write_log(f"Trying API: {api_url}", debug_option)
+
+        response = requests.get(api_url, headers=headers)
+
+        debug_write_log(f"API status: {response.status_code}", debug_option)
+        debug_write_log(
+            f"Response (first 500 chars): {response.text[:500]}", debug_option
+        )
+
+        if response.status_code == 200:
+            try:
+                data = response.json()
+                # Check if we got meaningful data
+                if data and (isinstance(data, dict) and len(data) > 0):
+                    debug_write_log("Got valid JSON response", debug_option)
+                    debug_write_log(
+                        json.dumps(data, indent=2, ensure_ascii=False)[:2000],
+                        debug_option,
+                    )
+                    return data
+            except json.JSONDecodeError:
+                debug_write_log(f"Failed to parse JSON from {api_url}", debug_option)
+                continue
+
+    # If all API attempts failed, raise error
+    assert False, f"Failed to get tweet details from any Syndication API endpoint. Tweet url: {tweet_url}"
+
+
+def extract_media_from_syndication(syndication_data):
+    """
+    Extract video and image URLs from Syndication API response.
+    Returns: (video_urls, gif_flag, image_urls)
+    """
+    video_urls = []
+    image_urls = []
+    gif_flag = False
+
+    # Extract videos from mediaDetails
+    if "mediaDetails" in syndication_data:
+        for media in syndication_data["mediaDetails"]:
+            if media.get("type") == "video" or media.get("type") == "animated_gif":
+                if media.get("type") == "animated_gif":
+                    gif_flag = True
+
+                video_info = media.get("video_info", {})
+                variants = video_info.get("variants", [])
+
+                # Find the highest bitrate video
+                max_bitrate = 0
+                best_url = None
+
+                for variant in variants:
+                    if variant.get("content_type") == "video/mp4":
+                        bitrate = variant.get("bitrate", 0)
+                        if bitrate > max_bitrate:
+                            max_bitrate = bitrate
+                            best_url = variant.get("url")
+                        elif bitrate == 0 and best_url is None:
+                            # For GIFs without bitrate
+                            best_url = variant.get("url")
+
+                if best_url:
+                    video_urls.append(best_url)
+
+    # Extract videos from card (for promoted/ad tweets)
+    if "card" in syndication_data and not video_urls:
+        card = syndication_data["card"]
+        if "binding_values" in card and "unified_card" in card["binding_values"]:
+            unified_card_str = card["binding_values"]["unified_card"].get(
+                "string_value", ""
+            )
+            if unified_card_str:
+                try:
+                    unified_card = json.loads(unified_card_str)
+                    media_entities = unified_card.get("media_entities", {})
+
+                    for _, media in media_entities.items():
+                        if (
+                            media.get("type") == "video"
+                            or media.get("type") == "animated_gif"
+                        ):
+                            if media.get("type") == "animated_gif":
+                                gif_flag = True
+
+                            video_info = media.get("video_info", {})
+                            variants = video_info.get("variants", [])
+
+                            # Find the highest bitrate video
+                            max_bitrate = 0
+                            best_url = None
+
+                            for variant in variants:
+                                if variant.get("content_type") == "video/mp4":
+                                    bitrate = variant.get("bitrate", 0)
+                                    if bitrate > max_bitrate:
+                                        max_bitrate = bitrate
+                                        best_url = variant.get("url")
+                                    elif bitrate == 0 and best_url is None:
+                                        best_url = variant.get("url")
+
+                            if best_url:
+                                video_urls.append(best_url)
+                except json.JSONDecodeError as e:
+                    debug_write_log(
+                        f"Failed to parse unified_card JSON: {e}", debug_option
+                    )
+
+    # Extract images from photos
+    if image_save_option and "photos" in syndication_data:
+        for photo in syndication_data["photos"]:
+            photo_url = photo.get("url")
+            if photo_url:
+                image_urls.append(photo_url)
+
+    debug_write_log(
+        f"Extracted {len(video_urls)} videos and {len(image_urls)} images", debug_option
+    )
+
+    return video_urls, gif_flag, image_urls
 
 
 def get_associated_media_id(j, tweet_url):
@@ -511,9 +714,19 @@ def repost_check(j, exclude_replies=True):
 
 
 def download_video(tweet_url, output_file, target_all_videos=False):
-    bearer_token, guest_token = get_tokens(tweet_url)
-    resp = get_tweet_details(tweet_url, guest_token, bearer_token)
-    mp4s = extract_mp4s(resp.text, tweet_url, target_all_videos)
+    # Try Syndication API first (no authentication required)
+    try:
+        syndication_data = get_tweet_details_syndication(tweet_url)
+        video_urls, _, _ = extract_media_from_syndication(syndication_data)
+        mp4s = video_urls if video_urls else []
+    except Exception as e:
+        debug_write_log(
+            f"Syndication API failed: {e}. Falling back to GraphQL API.", debug_option
+        )
+        # Fallback to GraphQL API
+        bearer_token, guest_token, query_id = get_tokens(tweet_url)
+        resp = get_tweet_details(tweet_url, guest_token, bearer_token, query_id)
+        mp4s = extract_mp4s(resp.text, tweet_url, target_all_videos)
     # sometimes there will be multiple mp4s extracted.  This happens when a twitter thread has multiple videos.  What should we do?  Could get all of them, or just the first one.  I think the first one in the list is the one that the user requested... I think that's always true.  We'll just do that and change it if someone complains.
     # names = [output_file.replace('.mp4', f'_{i}.mp4') for i in range(len(mp4s))]
 
@@ -729,7 +942,7 @@ def get_card_type_vid_url(data):
                 json_value = json.loads(string_value)
                 media_entities = json_value.get("media_entities")
                 if media_entities:
-                    for media_key, media_info in media_entities.items():
+                    for _, media_info in media_entities.items():
                         video_info = media_info.get("video_info")
                         if video_info:
                             variants = video_info.get("variants")
@@ -887,11 +1100,28 @@ def download_videos(video_urls, output_file, output_folder_path, gif_ptn):
 
 def download_video_for_sc(tweet_url, output_file="", output_folder_path="./output"):
     delete_debug_log(debug_option)
-    bearer_token, guest_token = get_tokens(
-        tweet_url.replace("https://twitter.com", "https://x.com")
-    )
-    resp = get_tweet_details(tweet_url, guest_token, bearer_token)
-    video_urls, gif_ptn, img_urls = create_video_urls(resp.text)
-    if image_save_option:
+
+    # Normalize URL
+    tweet_url = tweet_url.replace("https://twitter.com", "https://x.com")
+
+    # Use Syndication API (no authentication required)
+    try:
+        syndication_data = get_tweet_details_syndication(tweet_url)
+        video_urls, gif_ptn, img_urls = extract_media_from_syndication(syndication_data)
+    except Exception as e:
+        debug_write_log(
+            f"Syndication API failed: {e}. Falling back to GraphQL API.", debug_option
+        )
+        # Fallback to GraphQL API
+        bearer_token, guest_token, query_id = get_tokens(tweet_url)
+        resp = get_tweet_details(tweet_url, guest_token, bearer_token, query_id)
+        video_urls, gif_ptn, img_urls = create_video_urls(resp.text)
+
+    if image_save_option and img_urls:
         get_img(img_urls, output_file, output_folder_path)
-    download_videos(video_urls, output_file, output_folder_path, gif_ptn)
+
+    if video_urls:
+        download_videos(video_urls, output_file, output_folder_path, gif_ptn)
+    else:
+        print(f"No videos found in tweet: {tweet_url}")
+        debug_write_log("No videos found in tweet", debug_option)

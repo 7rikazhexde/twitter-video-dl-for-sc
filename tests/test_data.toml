@@ -86,7 +86,7 @@ output_directory = "../output"
 expected_files = ["output.gif"]
 audio_check_flag = [false]
 
-# card type(NG)
+# card type (promoted/ad tweet)
 [[tests]]
 title = "test-case-No10"
 url = "https://twitter.com/GOTGTheGame/status/1451361961782906889"
