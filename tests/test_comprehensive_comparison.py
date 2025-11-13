@@ -143,8 +143,8 @@ def test_graphql_api_with_all_toml_cases():
 
         try:
             # Use GraphQL API (Fallback method) with curl-cffi
-            bearer_token, guest_token = get_tokens(url)
-            resp = get_tweet_details(url, guest_token, bearer_token)
+            bearer_token, guest_token, query_id = get_tokens(url)
+            resp = get_tweet_details(url, guest_token, bearer_token, query_id)
             video_urls, gif_ptn, img_urls = create_video_urls(resp.text)
 
             # Download images if available

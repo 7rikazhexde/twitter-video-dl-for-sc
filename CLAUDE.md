@@ -98,7 +98,7 @@ The application uses a dual-API strategy for maximum reliability:
    - Used when Syndication API fails
    - Requires bearer token and guest token
    - Uses curl-cffi with Chrome 110 browser impersonation to avoid TLS fingerprint blocking
-   - Fixed Query ID (0hWvDhmW8YQ-S_ib3azIrw) for reliability
+   - Dynamic Query ID extraction from main.js for automatic adaptation to X API changes
 
 ### Key Functions in `twitter_video_dl.py`
 
@@ -111,8 +111,8 @@ The application uses a dual-API strategy for maximum reliability:
 
 **GraphQL API (Fallback Method):**
 
-- `get_tokens(tweet_url)`: Extracts bearer token from main.js and guest token via API using curl-cffi with Chrome 110 browser impersonation
-- `get_tweet_details(tweet_url, guest_token, bearer_token)`: Calls TweetResultByRestId GraphQL endpoint with fixed Query ID
+- `get_tokens(tweet_url)`: Extracts bearer token, guest token, and Query ID using curl-cffi with Chrome 110 browser impersonation
+- `get_tweet_details(tweet_url, guest_token, bearer_token, query_id)`: Calls TweetResultByRestId GraphQL endpoint with dynamically extracted Query ID
 - `create_video_urls(json_data)`: Parses GraphQL response JSON to extract video/image URLs
 
 **Common Functions:**
@@ -169,15 +169,16 @@ Used when Syndication API fails or returns no videos:
 
 1. Normalize URL (twitter.com → x.com to avoid redirects)
 2. Fetch bearer token from Twitter's main.js using curl-cffi
-3. Get guest token via API using curl-cffi with Chrome 110 browser impersonation
-4. Query TweetResultByRestId GraphQL endpoint with fixed Query ID (0hWvDhmW8YQ-S_ib3azIrw)
-5. Parse JSON response for video variants (selects highest bitrate)
-6. Handle two video types:
+3. Dynamically extract Query ID from main.js using pattern matching
+4. Get guest token via API using curl-cffi with Chrome 110 browser impersonation
+5. Query TweetResultByRestId GraphQL endpoint with dynamically extracted Query ID
+6. Parse JSON response for video variants (selects highest bitrate)
+7. Handle two video types:
    - Simple: Single MP4 file
    - Segmented: MP4 container + multiple M4S chunks (assembled in memory)
-7. Detect reposted videos via `source_status_id_str` and recursively download original
-8. Optional: Convert MP4 to GIF for animated tweets
-9. Optional: Download associated images
+8. Detect reposted videos via `source_status_id_str` and recursively download original
+9. Optional: Convert MP4 to GIF for animated tweets
+10. Optional: Download associated images
 
 ## Testing
 
@@ -249,11 +250,12 @@ Configured in `.pre-commit-config.yaml`:
 
 **GraphQL API changes:**
 
-1. Uses fixed Query ID (0hWvDhmW8YQ-S_ib3azIrw) for reliability
-2. If Query ID becomes invalid, update the hardcoded value in `get_tweet_details()` function
-3. If `RequestDetails.json` needs changes, edit features/variables
-4. The auto-retry mechanism will update it if Twitter rejects the request
-5. Commit updated `RequestDetails.json` if changes are successful
+1. Query ID is dynamically extracted from main.js at runtime
+2. Automatic adaptation to X (Twitter) Query ID changes without manual updates
+3. If Query ID extraction fails, check and update the regex pattern in `get_tokens()` function
+4. If `RequestDetails.json` needs changes, edit features/variables
+5. The auto-retry mechanism will update it if Twitter rejects the request
+6. Commit updated `RequestDetails.json` if changes are successful
 
 ### Adding configuration options
 
@@ -267,7 +269,7 @@ Configured in `.pre-commit-config.yaml`:
 - **GraphQL API Fallback**:
   - Large segmented videos load entirely in memory (potential OOM for huge files)
   - Requires curl-cffi for TLS fingerprint handling (falls back to standard requests if unavailable)
-  - Fixed Query ID may need updates if Twitter changes their API
+  - Dynamic Query ID extraction regex pattern may need updates if X significantly changes main.js structure
 - Browser extension only tested on Chrome/Brave
 - iOS Shortcuts only tested on iPhone/iPad (not Mac)
 - Requires FFmpeg for GIF conversion (not needed for iOS Shortcuts with a-Shell)

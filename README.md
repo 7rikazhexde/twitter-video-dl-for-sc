@@ -400,7 +400,7 @@ This project uses a two-tier API approach for maximum reliability:
    - Used when Syndication API fails
    - Requires bearer token and guest token
    - Uses curl-cffi with Chrome 110 browser impersonation to avoid TLS fingerprint blocking
-   - Fixed Query ID for reliability (0hWvDhmW8YQ-S_ib3azIrw)
+   - Dynamic Query ID extraction from main.js for automatic adaptation to X API changes
 
 ### Auto Retry Feature
 
