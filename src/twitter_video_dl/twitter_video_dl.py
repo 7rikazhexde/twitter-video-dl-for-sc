@@ -79,6 +79,9 @@ def get_tokens(tweet_url):
     4. Now that we have the bearer token, how do we get the guest id?  Easy, we activate the bearer token to get it.
     """
 
+    # Normalize URL (twitter.com -> x.com)
+    tweet_url = tweet_url.replace("https://twitter.com", "https://x.com")
+
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0",
         "Accept": "*/*",
@@ -343,6 +346,9 @@ def get_tweet_details_syndication(tweet_url):
     Use Twitter's Syndication API and fallback methods to get tweet details.
     This API doesn't require authentication and is more stable.
     """
+    # Normalize URL (twitter.com -> x.com)
+    tweet_url = tweet_url.replace("https://twitter.com", "https://x.com")
+
     tweet_id = re.findall(r"(?<=status/)\d+", tweet_url)
 
     assert (
