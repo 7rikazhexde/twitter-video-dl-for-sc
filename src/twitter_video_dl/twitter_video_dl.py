@@ -917,7 +917,8 @@ def get_img(urls, file_name, output_folder_path):
         try:
             if response.status_code == 200:
                 with open(output_file_name, "wb") as f:
-                    for chunk in response.iter_content(chunk_size=8192):
+                    # iter_content() without chunk_size to avoid curl-cffi warning
+                    for chunk in response.iter_content():
                         if chunk:
                             f.write(chunk)
                     print(f"Image {output_file_name} downloaded successfully.")
@@ -1069,7 +1070,8 @@ def download_videos(video_urls, output_file, output_folder_path, gif_ptn):
         try:
             if response.status_code == 200:
                 with open(output_file_name, "wb") as f:
-                    for chunk in response.iter_content(chunk_size=8192):
+                    # iter_content() without chunk_size to avoid curl-cffi warning
+                    for chunk in response.iter_content():
                         if chunk:
                             f.write(chunk)
                     print(f"Video {output_file_name} downloaded successfully.")
