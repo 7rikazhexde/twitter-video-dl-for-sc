@@ -9,5 +9,5 @@
   "image":{
     "save_option": true
   },
-  "debug_option": true
+  "debug_option": false
 }

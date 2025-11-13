@@ -4,7 +4,8 @@ This project is based on the original code of the [inteoryx / twitter-video-dl](
 
 **Key Features:**
 
-- **Dual-API Strategy**: Uses Syndication API (primary, no authentication required) with GraphQL API fallback for maximum reliability
+- **Dual-API Strategy**: Uses Syndication API (primary, no authentication required) with GraphQL API + curl-cffi fallback for maximum reliability
+- **TLS Fingerprint Handling**: curl-cffi with browser impersonation to avoid X (Twitter) TLS fingerprint blocking
 - **Card-Type Video Support**: Downloads videos from promoted/ad tweets
 - **iOS Shortcuts Integration**: Optimized for iOS Shortcuts workflow
 - **Browser Extension Support**: Chrome/Brave extension for easy video downloads
@@ -395,10 +396,11 @@ This project uses a two-tier API approach for maximum reliability:
    - Supports regular videos, GIFs, and card-type videos (promoted/ad tweets)
 
 2. **GraphQL API (Fallback)**
-   - Endpoint: `api.x.com/i/api/graphql`
+   - Endpoint: `twitter.com/i/api/graphql`
    - Used when Syndication API fails
    - Requires bearer token and guest token
-   - Dynamic Query ID extraction from main.js
+   - Uses curl-cffi with Chrome 110 browser impersonation to avoid TLS fingerprint blocking
+   - Fixed Query ID for reliability (0hWvDhmW8YQ-S_ib3azIrw)
 
 ### Auto Retry Feature
 
@@ -427,15 +429,34 @@ Before submitting an issue, please double-check that you have the correct URL fo
 
 ## Test-Environment For twitter-video-dl-for-sc
 
-twitter-video-dl-for-sc uses ffmpeg for saving videos. Therefore, we provide a test environment for twitter-video-dl-for-sc in addition to the test cases for twitter-video-dl.
+twitter-video-dl-for-sc uses ffmpeg for saving videos. We provide comprehensive test suites for both API methods:
+
+### Test Files
+
+1. **`test_syndication_api.py`** - Syndication API unit tests (5 tests)
+2. **`test_graphql_api.py`** - GraphQL API unit tests (7 tests)
+3. **`test_comprehensive_comparison.py`** - Full test suite using test_data.toml (34 test cases total)
+   - Tests Syndication API with all 17 test_data.toml cases
+   - Tests GraphQL API with all 17 test_data.toml cases
 
 ### Usage
 
 If you get an error with the specified URL, please register an issue. If you want to test individually, you can test in advance by adding the URL of the post where the video was posted to [test_data.toml](./tests/test_data.toml).
 
 > [!NOTE]
-> **Testing with uv**: `uv sync --extra dev` then `uv run pytest` or `just test`  
+> **Testing with uv**: `uv sync --extra dev` then `uv run pytest` or `just test`
 > **Testing with pip**: `pip install -r requirements-dev.txt` then `pytest tests/`
 
 > [!IMPORTANT]
-> When running full tests with `just test`, ensure that the `"save_option"` of the `"image"` key in [settings.json](./src/twitter_video_dl/settings.json) is set to `true`.
+> When running full tests with `just test`, ensure that both `"save_option": true` and `"debug_option": true` in [settings.json](./src/twitter_video_dl/settings.json) for comprehensive test coverage.
+
+### Test Coverage
+
+All tests validate:
+
+- Video/GIF downloads
+- Image downloads (when enabled)
+- Multiple videos per tweet
+- Card-type videos (promoted/ad tweets)
+- File integrity with ffmpeg probe
+- Both twitter.com and x.com URL formats
