@@ -94,10 +94,11 @@ The application uses a dual-API strategy for maximum reliability:
    - More stable and reliable
    - Supports regular videos, GIFs, and card-type videos (promoted/ad tweets)
 
-2. **GraphQL API (Fallback)**: `api.x.com/i/api/graphql`
+2. **GraphQL API (Fallback)**: `twitter.com/i/api/graphql`
    - Used when Syndication API fails
    - Requires bearer token and guest token
-   - Dynamic Query ID extraction from main.js
+   - Uses curl-cffi with Chrome 110 browser impersonation to avoid TLS fingerprint blocking
+   - Fixed Query ID (0hWvDhmW8YQ-S_ib3azIrw) for reliability
 
 ### Key Functions in `twitter_video_dl.py`
 
@@ -110,8 +111,8 @@ The application uses a dual-API strategy for maximum reliability:
 
 **GraphQL API (Fallback Method):**
 
-- `get_tokens(tweet_url)`: Extracts bearer token from main.js and guest token from HTML cookies, dynamically gets GraphQL Query ID
-- `get_tweet_details(tweet_url, guest_token, bearer_token, query_id)`: Calls TweetResultByRestId GraphQL endpoint
+- `get_tokens(tweet_url)`: Extracts bearer token from main.js and guest token via API using curl-cffi with Chrome 110 browser impersonation
+- `get_tweet_details(tweet_url, guest_token, bearer_token)`: Calls TweetResultByRestId GraphQL endpoint with fixed Query ID
 - `create_video_urls(json_data)`: Parses GraphQL response JSON to extract video/image URLs
 
 **Common Functions:**
@@ -146,7 +147,7 @@ The `get_tweet_details()` function includes smart retry logic (max 10 attempts) 
 }
 ```
 
-**Important**: When running `just test`, ensure `image.save_option` is `true` for full test coverage.
+**Important**: When running `just test`, ensure `image.save_option` is `true` for full test coverage (debug_option can be false for normal testing).
 
 ### Video Download Flow
 
@@ -162,14 +163,14 @@ The `get_tweet_details()` function includes smart retry logic (max 10 attempts) 
 6. Optional: Convert MP4 to GIF for animated tweets
 7. Optional: Download associated images
 
-**Fallback Flow (GraphQL API):**
+**Fallback Flow (GraphQL API with curl-cffi):**
 
 Used when Syndication API fails or returns no videos:
 
-1. Fetch bearer token from Twitter's main.js
-2. Extract guest token from HTML page cookies
-3. Dynamically extract GraphQL Query ID from main.js
-4. Query TweetResultByRestId GraphQL endpoint
+1. Normalize URL (twitter.com → x.com to avoid redirects)
+2. Fetch bearer token from Twitter's main.js using curl-cffi
+3. Get guest token via API using curl-cffi with Chrome 110 browser impersonation
+4. Query TweetResultByRestId GraphQL endpoint with fixed Query ID (0hWvDhmW8YQ-S_ib3azIrw)
 5. Parse JSON response for video variants (selects highest bitrate)
 6. Handle two video types:
    - Simple: Single MP4 file
@@ -182,12 +183,22 @@ Used when Syndication API fails or returns no videos:
 
 Tests are located in `tests/` and use `pytest`. Test URLs are defined in `tests/test_data.toml`.
 
+### Test Files
+
+1. **`test_syndication_api.py`** - Syndication API unit tests (5 tests)
+2. **`test_graphql_api.py`** - GraphQL API unit tests with curl-cffi (7 tests)
+3. **`test_comprehensive_comparison.py`** - Full test suite using test_data.toml (34 test cases total)
+   - Tests Syndication API with all 17 test_data.toml cases
+   - Tests GraphQL API with all 17 test_data.toml cases
+
 ```bash
 # Run all tests
 uv run pytest tests/
 
-# Run specific test
-uv run pytest tests/test_download_video_for_sc.py::test_download_videos
+# Run specific test file
+uv run pytest tests/test_syndication_api.py
+uv run pytest tests/test_graphql_api.py
+uv run pytest tests/test_comprehensive_comparison.py
 ```
 
 **Test cleanup**: `teardown_function()` automatically removes `tests/output/` after each test.
@@ -238,10 +249,11 @@ Configured in `.pre-commit-config.yaml`:
 
 **GraphQL API changes:**
 
-1. The Query ID is extracted dynamically from main.js (no manual update needed)
-2. If `RequestDetails.json` needs changes, edit features/variables
-3. The auto-retry mechanism will update it if Twitter rejects the request
-4. Commit updated `RequestDetails.json` if changes are successful
+1. Uses fixed Query ID (0hWvDhmW8YQ-S_ib3azIrw) for reliability
+2. If Query ID becomes invalid, update the hardcoded value in `get_tweet_details()` function
+3. If `RequestDetails.json` needs changes, edit features/variables
+4. The auto-retry mechanism will update it if Twitter rejects the request
+5. Commit updated `RequestDetails.json` if changes are successful
 
 ### Adding configuration options
 
@@ -252,7 +264,10 @@ Configured in `.pre-commit-config.yaml`:
 ## Known Limitations
 
 - **Syndication API**: Some very old tweets or deleted tweets may not be accessible
-- **GraphQL API Fallback**: Large segmented videos load entirely in memory (potential OOM for huge files)
+- **GraphQL API Fallback**:
+  - Large segmented videos load entirely in memory (potential OOM for huge files)
+  - Requires curl-cffi for TLS fingerprint handling (falls back to standard requests if unavailable)
+  - Fixed Query ID may need updates if Twitter changes their API
 - Browser extension only tested on Chrome/Brave
 - iOS Shortcuts only tested on iPhone/iPad (not Mac)
 - Requires FFmpeg for GIF conversion (not needed for iOS Shortcuts with a-Shell)

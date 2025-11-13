@@ -5,7 +5,15 @@ import re
 import subprocess
 import urllib.parse
 
-import requests
+# Use curl-cffi instead of standard requests for TLS fingerprint handling
+try:
+    from curl_cffi import requests
+
+    USE_CURL_CFFI = True
+except ImportError:
+    import requests
+
+    USE_CURL_CFFI = False
 
 """
 Hey, thanks for reading the comments.  I love you.
@@ -71,6 +79,9 @@ def get_tokens(tweet_url):
     4. Now that we have the bearer token, how do we get the guest id?  Easy, we activate the bearer token to get it.
     """
 
+    # Normalize URL (twitter.com -> x.com)
+    tweet_url = tweet_url.replace("https://twitter.com", "https://x.com")
+
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0",
         "Accept": "*/*",
@@ -79,8 +90,16 @@ def get_tokens(tweet_url):
         "TE": "trailers",
     }
 
-    session = requests.Session()
-    response = session.get(tweet_url, headers=headers)
+    # Use curl-cffi with browser impersonation to avoid TLS fingerprint blocking
+    if USE_CURL_CFFI:
+        session = requests.Session(impersonate="chrome110")
+    else:
+        session = requests.Session()
+
+    # Persist headers across all requests (like Node.js axios.create())
+    session.headers.update(headers)
+
+    response = session.get(tweet_url)
     debug_write_log(response.text, debug_option)
 
     assert (
@@ -110,7 +129,7 @@ def get_tokens(tweet_url):
     tok_match = re.search(r'tok=([^&"]+)', redirect_url)
     tok = tok_match.group(1) if tok_match else None
 
-    response = session.get(redirect_url, headers=headers, allow_redirects=False)
+    response = session.get(redirect_url, allow_redirects=False)
     debug_write_log(response.text, debug_option)
 
     assert (
@@ -133,9 +152,7 @@ def get_tokens(tweet_url):
 
     # Only send auth request if we have parameters
     if auth_params:
-        response = session.post(
-            auth_url, data=auth_params, headers=headers, allow_redirects=True
-        )
+        response = session.post(auth_url, data=auth_params, allow_redirects=True)
 
         debug_write_log(response.text, debug_option)
 
@@ -143,7 +160,7 @@ def get_tokens(tweet_url):
             response.status_code == 200
         ), f"Failed to authenticate. Status code: {response.status_code}. Auth URL: {auth_url}"
     else:
-        response = session.get(redirect_url, headers=headers)
+        response = session.get(redirect_url)
 
     # Find main.js URL
     mainjs_urls = re.findall(
@@ -179,48 +196,25 @@ def get_tokens(tweet_url):
     if bearer_token.startswith("Bearer "):
         bearer_token = bearer_token.replace("Bearer ", "")
 
-    # Extract TweetResultByRestId GraphQL query ID from main.js
-    # Pattern: TweetResultByRestId:{queryId:"<ID>",operationName:"TweetResultByRestId",...}
-    query_id_pattern = r'TweetResultByRestId.*?queryId:"([^"]+)"'
-    query_id_match = re.search(query_id_pattern, mainjs.text)
+    # Get guest token via API (more reliable with curl-cffi)
+    session.headers.update({"authorization": f"Bearer {bearer_token}"})
+    guest_token_response = session.post(
+        "https://api.twitter.com/1.1/guest/activate.json"
+    )
 
-    if query_id_match:
-        tweet_detail_query_id = query_id_match.group(1)
-        debug_write_log(
-            f"Found TweetResultByRestId query ID: {tweet_detail_query_id}", debug_option
-        )
-    else:
-        # Fallback to old query ID if not found
-        tweet_detail_query_id = "0hWvDhmW8YQ-S_ib3azIrw"
-        debug_write_log(
-            f"Using fallback query ID: {tweet_detail_query_id}", debug_option
-        )
+    debug_write_log(guest_token_response.text, debug_option)
 
-    # Extract guest token from the HTML response (from gt cookie)
-    # The guest token is set in a cookie via JavaScript: document.cookie="gt=<token>; ..."
-    gt_match = re.search(r'document\.cookie="gt=(\d+);', response.text)
+    assert (
+        guest_token_response.status_code == 200
+    ), f"Failed to activate guest token. Status code: {guest_token_response.status_code}. Tweet url: {tweet_url}"
 
-    if gt_match:
-        guest_token = gt_match.group(1)
-        debug_write_log(f"Found guest token from cookie: {guest_token}", debug_option)
-    else:
-        # Fallback: Try the old API endpoint
-        session.headers.update({"authorization": f"Bearer {bearer_token}"})
-        guest_token_response = session.post("https://api.x.com/1.1/guest/activate.json")
-
-        debug_write_log(guest_token_response.text, debug_option)
-
-        assert (
-            guest_token_response.status_code == 200
-        ), f"Failed to activate guest token. Status code: {guest_token_response.status_code}. Tweet url: {tweet_url}"
-
-        guest_token = guest_token_response.json()["guest_token"]
+    guest_token = guest_token_response.json()["guest_token"]
 
     assert (
         guest_token is not None and len(guest_token) > 0
     ), f"Failed to find guest token. Tweet url: {tweet_url}, main.js url: {mainjs_url}"
 
-    return bearer_token, guest_token, tweet_detail_query_id
+    return bearer_token, guest_token
 
 
 def get_details_url(tweet_id, features, variables, query_id="0hWvDhmW8YQ-S_ib3azIrw"):
@@ -228,7 +222,7 @@ def get_details_url(tweet_id, features, variables, query_id="0hWvDhmW8YQ-S_ib3az
     variables = {**variables}
     variables["tweetId"] = tweet_id
 
-    return f"https://x.com/i/api/graphql/{query_id}/TweetResultByRestId?variables={urllib.parse.quote(json.dumps(variables))}&features={urllib.parse.quote(json.dumps(features))}"
+    return f"https://twitter.com/i/api/graphql/{query_id}/TweetResultByRestId?variables={urllib.parse.quote(json.dumps(variables))}&features={urllib.parse.quote(json.dumps(features))}"
 
 
 def get_tweet_details(
@@ -245,18 +239,18 @@ def get_tweet_details(
     # the url needs a url encoded version of variables and features as a query string
     url = get_details_url(tweet_id, features, variables, query_id)
 
-    details = requests.get(
-        url,
-        headers={
-            "authorization": f"Bearer {bearer_token}",
-            "x-guest-token": guest_token,
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0",
-            "Accept": "*/*",
-            "Accept-Language": "en-US, en, *;q=0.5",
-            "Accept-Encoding": "gzip, deflate, br",
-            "Content-Type": "application/json",
-        },
-    )
+    # Use curl-cffi for GraphQL API requests to avoid TLS fingerprint blocking
+    headers = {
+        "authorization": f"Bearer {bearer_token}",
+        "x-guest-token": guest_token,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0",
+        "Accept": "*/*",
+        "Accept-Language": "en-US, en, *;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Content-Type": "application/json",
+    }
+
+    details = requests.get(url, headers=headers)
 
     # Log response status and try to parse JSON
     debug_write_log(f"Response status: {details.status_code}", debug_option)
@@ -302,18 +296,7 @@ def get_tweet_details(
 
         url = get_details_url(tweet_id, features, variables, query_id)
 
-        details = requests.get(
-            url,
-            headers={
-                "authorization": f"Bearer {bearer_token}",
-                "x-guest-token": guest_token,
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0",
-                "Accept": "*/*",
-                "Accept-Language": "en-US, en, *;q=0.5",
-                "Accept-Encoding": "gzip, deflate, br",
-                "Content-Type": "application/json",
-            },
-        )
+        details = requests.get(url, headers=headers)
 
         # Try to log the response
         try:
@@ -363,6 +346,9 @@ def get_tweet_details_syndication(tweet_url):
     Use Twitter's Syndication API and fallback methods to get tweet details.
     This API doesn't require authentication and is more stable.
     """
+    # Normalize URL (twitter.com -> x.com)
+    tweet_url = tweet_url.replace("https://twitter.com", "https://x.com")
+
     tweet_id = re.findall(r"(?<=status/)\d+", tweet_url)
 
     assert (
@@ -724,8 +710,8 @@ def download_video(tweet_url, output_file, target_all_videos=False):
             f"Syndication API failed: {e}. Falling back to GraphQL API.", debug_option
         )
         # Fallback to GraphQL API
-        bearer_token, guest_token, query_id = get_tokens(tweet_url)
-        resp = get_tweet_details(tweet_url, guest_token, bearer_token, query_id)
+        bearer_token, guest_token = get_tokens(tweet_url)
+        resp = get_tweet_details(tweet_url, guest_token, bearer_token)
         mp4s = extract_mp4s(resp.text, tweet_url, target_all_videos)
     # sometimes there will be multiple mp4s extracted.  This happens when a twitter thread has multiple videos.  What should we do?  Could get all of them, or just the first one.  I think the first one in the list is the one that the user requested... I think that's always true.  We'll just do that and change it if someone complains.
     # names = [output_file.replace('.mp4', f'_{i}.mp4') for i in range(len(mp4s))]
@@ -913,7 +899,8 @@ def get_img(urls, file_name, output_folder_path):
                 else:
                     print("Invalid input. Please enter 'y' or 'n'.")
 
-        with requests.get(url, stream=True) as response:
+        response = requests.get(url, stream=True)
+        try:
             if response.status_code == 200:
                 with open(output_file_name, "wb") as f:
                     for chunk in response.iter_content(chunk_size=8192):
@@ -927,6 +914,8 @@ def get_img(urls, file_name, output_folder_path):
                 print(
                     f"If you are using the correct Twitter URL this suggests a bug in the script. Please open a GitHub issue and copy and paste this message. Tweet url: {url}"
                 )
+        finally:
+            response.close()
 
 
 def get_card_type_vid_url(data):
@@ -1062,7 +1051,8 @@ def download_videos(video_urls, output_file, output_folder_path, gif_ptn):
                 else:
                     print("Invalid input. Please enter 'y' or 'n'.")
 
-        with requests.get(video_url, stream=True) as response:
+        response = requests.get(video_url, stream=True)
+        try:
             if response.status_code == 200:
                 with open(output_file_name, "wb") as f:
                     for chunk in response.iter_content(chunk_size=8192):
@@ -1076,6 +1066,8 @@ def download_videos(video_urls, output_file, output_folder_path, gif_ptn):
                 print(
                     f"If you are using the correct Twitter URL this suggests a bug in the script. Please open a GitHub issue and copy and paste this message. Tweet url: {video_url}"
                 )
+        finally:
+            response.close()
 
         if gif_ptn:
             # Covert mp4 to gif
@@ -1113,8 +1105,8 @@ def download_video_for_sc(tweet_url, output_file="", output_folder_path="./outpu
             f"Syndication API failed: {e}. Falling back to GraphQL API.", debug_option
         )
         # Fallback to GraphQL API
-        bearer_token, guest_token, query_id = get_tokens(tweet_url)
-        resp = get_tweet_details(tweet_url, guest_token, bearer_token, query_id)
+        bearer_token, guest_token = get_tokens(tweet_url)
+        resp = get_tweet_details(tweet_url, guest_token, bearer_token)
         video_urls, gif_ptn, img_urls = create_video_urls(resp.text)
 
     if image_save_option and img_urls:
