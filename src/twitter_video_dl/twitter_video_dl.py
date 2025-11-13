@@ -196,6 +196,22 @@ def get_tokens(tweet_url):
     if bearer_token.startswith("Bearer "):
         bearer_token = bearer_token.replace("Bearer ", "")
 
+    # Extract Query ID from main.js
+    # Pattern: Look for queryId before operationName:"TweetResultByRestId"
+    # Example: queryId:"tCVRZ3WCvoj0BVO7BKnL-Q",operationName:"TweetResultByRestId"
+    query_id_match = re.search(
+        r'queryId:"([a-zA-Z0-9_-]+)"[^}]*?operationName:"TweetResultByRestId"',
+        mainjs.text,
+    )
+
+    assert (
+        query_id_match is not None
+    ), f"Failed to find query ID in main.js. Tweet url: {tweet_url}, main.js url: {mainjs_url}"
+
+    query_id = query_id_match.group(1)
+
+    debug_write_log(f"Extracted Query ID: {query_id}", debug_option)
+
     # Get guest token via API (more reliable with curl-cffi)
     session.headers.update({"authorization": f"Bearer {bearer_token}"})
     guest_token_response = session.post(
@@ -214,10 +230,10 @@ def get_tokens(tweet_url):
         guest_token is not None and len(guest_token) > 0
     ), f"Failed to find guest token. Tweet url: {tweet_url}, main.js url: {mainjs_url}"
 
-    return bearer_token, guest_token
+    return bearer_token, guest_token, query_id
 
 
-def get_details_url(tweet_id, features, variables, query_id="0hWvDhmW8YQ-S_ib3azIrw"):
+def get_details_url(tweet_id, features, variables, query_id):
     # create a copy of variables - we don't want to modify the original
     variables = {**variables}
     variables["tweetId"] = tweet_id
@@ -225,9 +241,7 @@ def get_details_url(tweet_id, features, variables, query_id="0hWvDhmW8YQ-S_ib3az
     return f"https://twitter.com/i/api/graphql/{query_id}/TweetResultByRestId?variables={urllib.parse.quote(json.dumps(variables))}&features={urllib.parse.quote(json.dumps(features))}"
 
 
-def get_tweet_details(
-    tweet_url, guest_token, bearer_token, query_id="0hWvDhmW8YQ-S_ib3azIrw"
-):
+def get_tweet_details(tweet_url, guest_token, bearer_token, query_id):
     tweet_id = re.findall(r"(?<=status/)\d+", tweet_url)
 
     assert (
@@ -1105,8 +1119,8 @@ def download_video_for_sc(tweet_url, output_file="", output_folder_path="./outpu
             f"Syndication API failed: {e}. Falling back to GraphQL API.", debug_option
         )
         # Fallback to GraphQL API
-        bearer_token, guest_token = get_tokens(tweet_url)
-        resp = get_tweet_details(tweet_url, guest_token, bearer_token)
+        bearer_token, guest_token, query_id = get_tokens(tweet_url)
+        resp = get_tweet_details(tweet_url, guest_token, bearer_token, query_id)
         video_urls, gif_ptn, img_urls = create_video_urls(resp.text)
 
     if image_save_option and img_urls:
