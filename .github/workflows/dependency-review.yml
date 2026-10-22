@@ -1,0 +1,30 @@
+name: Dependency Review
+
+# A green test suite proves the code still works - it does NOT prove a
+# dependency bump is safe to merge. This inspects the dependency diff of every
+# PR against the GitHub Advisory Database and fails the PR if it introduces a
+# dependency with a known vulnerability (>= moderate) or a denied license.
+# It is a no-op on PRs that touch no manifest/lockfile.
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  # Needed so the action can post its summary comment on a failing PR.
+  pull-requests: write
+
+jobs:
+  dependency-review:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Review dependency changes
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: moderate
+          comment-summary-in-pr: on-failure

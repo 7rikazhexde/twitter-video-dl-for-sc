@@ -7,6 +7,7 @@ import shutil
 import pytest
 
 from src.twitter_video_dl.twitter_video_dl import (
+    TwitterVideoDLError,
     extract_media_from_syndication,
     get_tweet_details_syndication,
 )
@@ -100,7 +101,7 @@ def test_syndication_api_invalid_tweet_id():
     """Test Syndication API handles invalid tweet ID"""
     invalid_url = "https://x.com/tw_7rikazhexde/status/invalid"
 
-    with pytest.raises(AssertionError) as e_info:
+    with pytest.raises(TwitterVideoDLError) as e_info:
         get_tweet_details_syndication(invalid_url)
 
     assert "Could not parse tweet id" in str(e_info.value)

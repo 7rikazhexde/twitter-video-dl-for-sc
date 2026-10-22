@@ -1,0 +1,48 @@
+version: 2
+
+# Update policy
+# - Dependency bumps are batched weekly into one grouped PR per ecosystem
+#   (instead of one PR per package) to keep review manageable for a
+#   single-maintainer project.
+# - `cooldown` delays every bump until the release has been public for a few
+#   days, so a freshly-published (or compromised) version is not pulled the
+#   instant it ships - this is the same class of risk as the eMudhra emSign CA
+#   incident, where trust had to be pulled from already-distributed certs.
+# - `dependency-review.yml` still fails any PR that introduces a known
+#   vulnerable dependency, and `pip-audit.yml` scans weekly independent of
+#   Dependabot. Merging a Dependabot PR stays manual.
+updates:
+  # Python dependencies (managed by uv; covers pyproject.toml + uv.lock)
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    cooldown:
+      default-days: 3
+      semver-major-days: 7
+      semver-minor-days: 5
+      semver-patch-days: 2
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "⬆️"
+    open-pull-requests-limit: 10
+
+  # GitHub Actions used in .github/workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    # NOTE: the github-actions ecosystem does not support the semver-*-days
+    # keys (Dependabot rejects them here) - only the flat default applies.
+    cooldown:
+      default-days: 3
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    commit-message:
+      prefix: "⬆️"
+    open-pull-requests-limit: 10
