@@ -8,13 +8,12 @@ import ffmpeg
 from tomlkit.toml_file import TOMLFile
 
 from src.twitter_video_dl.twitter_video_dl import (
-    create_video_urls,
     download_videos,
     extract_media_from_syndication,
+    extract_media_from_tweet_result,
     get_img,
-    get_tokens,
-    get_tweet_details,
     get_tweet_details_syndication,
+    get_tweet_result_from_page,
 )
 
 OUTPUT_FOLDER_PATH = "./tests/output"
@@ -125,7 +124,7 @@ def test_syndication_api_with_all_toml_cases():
 
 
 def test_graphql_api_with_all_toml_cases():
-    """Test GraphQL API (Fallback method) with all test_data.toml cases"""
+    """Test the fallback method (embedded tweet page data) with all test_data.toml cases"""
     # Get TOML file
     toml = TOMLFile("./tests/test_data.toml")
     toml_data = toml.read()
@@ -144,15 +143,16 @@ def test_graphql_api_with_all_toml_cases():
         acf_list = test.get("audio_check_flag", [])
 
         print(f"\n{'=' * 80}")
-        print(f"[GraphQL API] {title}")
+        print(f"[Fallback] {title}")
         print(f"URL: {url}")
         print(f"Expected files: {expected_files}")
 
         try:
-            # Use GraphQL API (Fallback method) with curl-cffi
-            bearer_token, guest_token, query_id = get_tokens(url)
-            resp = get_tweet_details(url, guest_token, bearer_token, query_id)
-            video_urls, gif_ptn, img_urls = create_video_urls(resp.text)
+            # Fallback: parse the TweetResultByRestId result embedded in the page
+            tweet_result = get_tweet_result_from_page(url)
+            video_urls, gif_ptn, img_urls = extract_media_from_tweet_result(
+                tweet_result
+            )
 
             # Download images if available
             if image_save_option and img_urls:
@@ -194,7 +194,7 @@ def test_graphql_api_with_all_toml_cases():
 
     # Summary
     print(f"\n{'=' * 80}")
-    print("[GraphQL API] Test Summary")
+    print("[Fallback] Test Summary")
     print(f"Total: {len(toml_get_data)} cases")
     print(f"Success: {success_count} ✅")
     print(f"Failure: {failure_count} ❌")

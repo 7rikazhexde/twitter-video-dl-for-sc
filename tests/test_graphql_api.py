@@ -1,4 +1,10 @@
-"""Test for GraphQL API with curl-cffi (Fallback method)"""
+"""Test for the fallback method used when the Syndication API fails.
+
+X's server-rendered tweet page embeds the TweetResultByRestId GraphQL
+result directly (as a Relay record), so the fallback parses that out of
+the page instead of scraping a bearer token out of a main.js bundle - the
+old main.js-based flow no longer works against X's current frontend.
+"""
 
 import json
 import os
@@ -8,9 +14,8 @@ import pytest
 
 from src.twitter_video_dl.twitter_video_dl import (
     TwitterVideoDLError,
-    create_video_urls,
-    get_tokens,
-    get_tweet_details,
+    extract_media_from_tweet_result,
+    get_tweet_result_from_page,
 )
 
 OUTPUT_FOLDER_PATH = "./tests/output"
@@ -35,138 +40,60 @@ def teardown_function(function):
         shutil.rmtree(OUTPUT_FOLDER_PATH)
 
 
-def test_graphql_api_get_tokens():
-    """Test GraphQL API can get bearer token, guest token, and query ID"""
+def test_fallback_get_tweet_result_from_page():
+    """Test that the embedded TweetResultByRestId result can be fetched and parsed"""
     test_url = "https://x.com/tw_7rikazhexde/status/1650804112987136000"
 
-    # Get tokens with curl-cffi
-    bearer_token, guest_token, query_id = get_tokens(test_url)
+    result = get_tweet_result_from_page(test_url)
 
-    # Verify bearer token
-    assert bearer_token is not None, "Bearer token should not be None"
-    assert len(bearer_token) > 0, "Bearer token should not be empty"
-    assert bearer_token.startswith("AAAAAAA"), "Bearer token should start with AAAAAAA"
-
-    # Verify guest token
-    assert guest_token is not None, "Guest token should not be None"
-    assert len(guest_token) > 0, "Guest token should not be empty"
-    assert guest_token.isdigit(), "Guest token should be numeric"
-
-    # Verify query ID
-    assert query_id is not None, "Query ID should not be None"
-    assert len(query_id) > 0, "Query ID should not be empty"
+    assert isinstance(result, dict), "Result should be a dictionary"
+    assert result.get("__typename") == "Tweet", "Result should be a Tweet"
+    assert "media_entities2" in result, "Result should contain media_entities2"
 
 
-def test_graphql_api_get_tweet_details():
-    """Test GraphQL API can fetch tweet details with curl-cffi"""
+def test_fallback_extract_video_urls():
+    """Test that video URLs can be extracted from the embedded tweet result"""
     test_url = "https://x.com/tw_7rikazhexde/status/1650804112987136000"
 
-    # Get tokens
-    bearer_token, guest_token, query_id = get_tokens(test_url)
+    result = get_tweet_result_from_page(test_url)
+    video_urls, gif_ptn, img_urls = extract_media_from_tweet_result(result)
 
-    # Get tweet details via GraphQL API
-    resp = get_tweet_details(test_url, guest_token, bearer_token, query_id)
-
-    # Verify response
-    assert resp.status_code == 200, f"Expected status 200, got {resp.status_code}"
-    assert len(resp.text) > 0, "Response text should not be empty"
-
-    # Verify response is valid JSON
-    json_data = json.loads(resp.text)
-    assert isinstance(json_data, dict), "Response should be a dictionary"
-    assert "data" in json_data, "Response should contain 'data' key"
-
-
-def test_graphql_api_extract_video_urls():
-    """Test GraphQL API can extract video URLs from response"""
-    test_url = "https://x.com/tw_7rikazhexde/status/1650804112987136000"
-
-    # Get tokens
-    bearer_token, guest_token, query_id = get_tokens(test_url)
-
-    # Get tweet details
-    resp = get_tweet_details(test_url, guest_token, bearer_token, query_id)
-
-    # Extract video URLs
-    video_urls, gif_ptn, img_urls = create_video_urls(resp.text)
-
-    # Verify video URLs extracted
     assert len(video_urls) > 0, "Should extract at least one video URL"
     assert all(url.startswith("http") for url in video_urls), (
         "All video URLs should be valid"
     )
-
-    # Verify gif pattern
     assert isinstance(gif_ptn, bool), "gif_ptn should be boolean"
-
-    # Verify image URLs
     assert isinstance(img_urls, list), "img_urls should be a list"
 
 
-def test_graphql_api_with_image_tweet():
-    """Test GraphQL API can extract videos and images"""
+def test_fallback_with_image_tweet():
+    """Test that both videos and images are extracted from a mixed-media tweet"""
     test_url = "https://x.com/tw_7rikazhexde/status/1754040936005538201"
 
-    # Get tokens
-    bearer_token, guest_token, query_id = get_tokens(test_url)
+    result = get_tweet_result_from_page(test_url)
+    video_urls, gif_ptn, img_urls = extract_media_from_tweet_result(result)
 
-    # Get tweet details
-    resp = get_tweet_details(test_url, guest_token, bearer_token, query_id)
-
-    # Extract media
-    video_urls, gif_ptn, img_urls = create_video_urls(resp.text)
-
-    # Verify media extracted
     assert len(video_urls) > 0, "Should extract videos"
     if image_save_option:
-        # Note: GraphQL API may or may not return images depending on tweet structure
-        assert isinstance(img_urls, list), "img_urls should be a list"
+        assert len(img_urls) > 0, (
+            "Should extract images when image_save_option is enabled"
+        )
 
 
-def test_graphql_api_invalid_tweet_id():
-    """Test GraphQL API handles invalid tweet ID"""
+def test_fallback_with_gif_tweet():
+    """Test that an animated GIF tweet is reported as a GIF"""
+    test_url = "https://x.com/tw_7rikazhexde/status/1735502484700057703"
+
+    result = get_tweet_result_from_page(test_url)
+    video_urls, gif_ptn, img_urls = extract_media_from_tweet_result(result)
+
+    assert len(video_urls) > 0, "Should extract the animated GIF as a video URL"
+    assert gif_ptn is True, "gif_ptn should be True for an animated_gif tweet"
+
+
+def test_fallback_invalid_tweet_id():
+    """Test that an invalid tweet URL raises TwitterVideoDLError"""
     invalid_url = "https://x.com/tw_7rikazhexde/status/invalid"
 
-    with pytest.raises(TwitterVideoDLError) as e_info:
-        bearer_token, guest_token, query_id = get_tokens(invalid_url)
-        get_tweet_details(invalid_url, guest_token, bearer_token, query_id)
-
-    # Error could occur at different stages
-    assert "Could not parse tweet id" in str(e_info.value) or "Failed to" in str(
-        e_info.value
-    )
-
-
-def test_graphql_api_curl_cffi_available():
-    """Test that curl-cffi is available and being used"""
-    # Check if curl-cffi is imported correctly
-    try:
-        from curl_cffi import requests  # noqa: F401
-
-        curl_cffi_available = True
-    except ImportError:
-        curl_cffi_available = False
-
-    # curl-cffi should be available based on our implementation
-    assert curl_cffi_available, "curl-cffi should be installed for GraphQL API fallback"
-
-
-def test_graphql_api_dynamic_query_id():
-    """Test that GraphQL API can dynamically extract query ID from main.js"""
-    test_url = "https://x.com/tw_7rikazhexde/status/1650804112987136000"
-
-    # Get tokens
-    bearer_token, guest_token, query_id = get_tokens(test_url)
-
-    # The get_tokens should return 3 values (bearer_token, guest_token, query_id)
-    assert bearer_token is not None, "Bearer token should not be None"
-    assert guest_token is not None, "Guest token should not be None"
-    assert query_id is not None, "Query ID should not be None"
-
-    # Query ID should be a non-empty string
-    assert isinstance(query_id, str), "Query ID should be a string"
-    assert len(query_id) > 0, "Query ID should not be empty"
-
-    # get_tweet_details should use the dynamically extracted query_id
-    resp = get_tweet_details(test_url, guest_token, bearer_token, query_id)
-    assert resp.status_code == 200, f"Expected status 200, got {resp.status_code}"
+    with pytest.raises(TwitterVideoDLError):
+        get_tweet_result_from_page(invalid_url)

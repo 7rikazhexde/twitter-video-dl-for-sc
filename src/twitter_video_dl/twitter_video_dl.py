@@ -644,6 +644,182 @@ def extract_media_from_syndication(syndication_data):
     return video_urls, gif_flag, image_urls
 
 
+# X now server-renders the tweet page with the GraphQL TweetResultByRestId
+# response already embedded as a Relay record (as opposed to the blank
+# "tweet not found" shell the old get_tokens()/get_tweet_details() flow was
+# written against). That old flow scraped a bearer token out of a main.js
+# file at a URL pattern X no longer serves; this one needs no bearer/guest
+# token or extra API call at all - everything is already on the page.
+RELAY_RESULT_PATTERN = re.compile(r'result:\$R\[\d+\]=\{kind:"Result\.Ok",value:"')
+
+
+def get_tweet_result_from_page(tweet_url):
+    """Fetch the tweet page and pull out the embedded TweetResultByRestId
+    GraphQL result that X's Relay-based frontend renders into the page."""
+    validate_tweet_url(tweet_url)
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0",
+        "Accept": "*/*",
+        "Accept-Language": "en-US, en, *;q=0.5",
+    }
+    if USE_CURL_CFFI:
+        session = requests.Session(impersonate="chrome110")
+    else:
+        session = requests.Session()
+    session.headers.update(headers)
+
+    response = session.get(tweet_url, timeout=REQUEST_TIMEOUT)
+    debug_write_log(response.text, debug_option)
+
+    if not (response.status_code == 200):
+        raise TwitterVideoDLError(
+            f"Failed to get tweet page. Status code: {response.status_code}. Tweet url: {tweet_url}"
+        )
+
+    text = response.text
+    name_idx = text.find('name:"TweetResultByRestId"')
+    if name_idx == -1:
+        raise TwitterVideoDLError(
+            f"Could not find an embedded TweetResultByRestId result on the tweet page. Tweet url: {tweet_url}"
+        )
+
+    # The result typically appears shortly after the request name in the
+    # page's inlined Relay store script; search a bounded window after it.
+    match = RELAY_RESULT_PATTERN.search(text, name_idx, name_idx + 4000)
+    if not match:
+        raise TwitterVideoDLError(
+            f"Could not find a Result.Ok value for TweetResultByRestId. Tweet url: {tweet_url}"
+        )
+
+    # The value is a JS double-quoted string literal (JSON-escaped); walk it
+    # by hand to find its unescaped closing quote, then decode it twice -
+    # once to unescape the JS string literal, once to parse the JSON it holds.
+    i = match.end()
+    chars = []
+    while text[i] != '"':
+        if text[i] == "\\":
+            chars.append(text[i : i + 2])
+            i += 2
+        else:
+            chars.append(text[i])
+            i += 1
+    try:
+        tweet_result_json = json.loads('"' + "".join(chars) + '"')
+        tweet_result = json.loads(tweet_result_json)
+    except json.JSONDecodeError as e:
+        raise TwitterVideoDLError(
+            f"Failed to parse the embedded TweetResultByRestId JSON. Tweet url: {tweet_url}. Error: {e}"
+        ) from e
+
+    result = (
+        tweet_result.get("data", {})
+        .get("tweet_result_by_rest_id", {})
+        .get("result", {})
+    )
+    # Some tweets (e.g. age-restricted) wrap the real Tweet one level deeper.
+    if result.get("__typename") != "Tweet" and "tweet" in result:
+        result = result["tweet"]
+
+    if not (result.get("__typename") == "Tweet"):
+        raise TwitterVideoDLError(
+            f"Embedded TweetResultByRestId result wasn't a Tweet (got {result.get('__typename')!r}). Tweet url: {tweet_url}"
+        )
+
+    return result
+
+
+def extract_media_from_tweet_result(result):
+    """Extract video and image URLs from a parsed TweetResultByRestId result.
+
+    Returns: (video_urls, gif_flag, image_urls) - same shape as
+    extract_media_from_syndication(), since the media schema (media type,
+    video_info.variants) is effectively the same.
+    """
+    video_urls = []
+    image_urls = []
+    gif_flag = False
+
+    for media in result.get("media_entities2", []):
+        media_type = media.get("type")
+
+        if media_type == "photo":
+            photo_url = media.get("media_url_https")
+            if image_save_option and photo_url:
+                image_urls.append(photo_url)
+            continue
+
+        if media_type not in ("video", "animated_gif"):
+            continue
+        if media_type == "animated_gif":
+            gif_flag = True
+
+        variants = media.get("video_info", {}).get("variants", [])
+        max_bitrate = 0
+        best_url = None
+        for variant in variants:
+            if variant.get("content_type") == "video/mp4":
+                bitrate = variant.get("bitrate", 0)
+                if bitrate > max_bitrate:
+                    max_bitrate = bitrate
+                    best_url = variant.get("url")
+                elif bitrate == 0 and best_url is None:
+                    best_url = variant.get("url")
+
+        if best_url:
+            video_urls.append(best_url)
+
+    # Card-type tweets (promoted/ad tweets) carry their media inside
+    # card.legacy.binding_values instead of media_entities2.
+    if not video_urls:
+        binding_values = (
+            result.get("card", {}).get("legacy", {}).get("binding_values", [])
+        )
+        unified_card_str = next(
+            (
+                b.get("value", {}).get("string_value")
+                for b in binding_values
+                if b.get("key") == "unified_card"
+            ),
+            None,
+        )
+        if unified_card_str:
+            try:
+                unified_card = json.loads(unified_card_str)
+            except json.JSONDecodeError as e:
+                debug_write_log(f"Failed to parse unified_card JSON: {e}", debug_option)
+                unified_card = {}
+
+            for media in unified_card.get("media_entities", {}).values():
+                media_type = media.get("type")
+                if media_type == "animated_gif":
+                    gif_flag = True
+                if media_type not in ("video", "animated_gif"):
+                    continue
+
+                variants = media.get("video_info", {}).get("variants", [])
+                max_bitrate = 0
+                best_url = None
+                for variant in variants:
+                    if variant.get("content_type") == "video/mp4":
+                        bitrate = variant.get("bitrate", 0)
+                        if bitrate > max_bitrate:
+                            max_bitrate = bitrate
+                            best_url = variant.get("url")
+                        elif bitrate == 0 and best_url is None:
+                            best_url = variant.get("url")
+
+                if best_url:
+                    video_urls.append(best_url)
+
+    debug_write_log(
+        f"Extracted {len(video_urls)} videos and {len(image_urls)} images from tweet result",
+        debug_option,
+    )
+
+    return video_urls, gif_flag, image_urls
+
+
 def get_associated_media_id(j, tweet_url):
     sid = get_tweet_status_id(tweet_url)
     pattern = (
@@ -1230,12 +1406,12 @@ def download_video_for_sc(tweet_url, output_file="", output_folder_path="./outpu
         video_urls, gif_ptn, img_urls = extract_media_from_syndication(syndication_data)
     except Exception as e:
         debug_write_log(
-            f"Syndication API failed: {e}. Falling back to GraphQL API.", debug_option
+            f"Syndication API failed: {e}. Falling back to embedded tweet page data.",
+            debug_option,
         )
-        # Fallback to GraphQL API
-        bearer_token, guest_token, query_id = get_tokens(tweet_url)
-        resp = get_tweet_details(tweet_url, guest_token, bearer_token, query_id)
-        video_urls, gif_ptn, img_urls = create_video_urls(resp.text)
+        # Fallback: parse the TweetResultByRestId result X embeds in the page
+        tweet_result = get_tweet_result_from_page(tweet_url)
+        video_urls, gif_ptn, img_urls = extract_media_from_tweet_result(tweet_result)
 
     if image_save_option and img_urls:
         get_img(img_urls, output_file, output_folder_path)

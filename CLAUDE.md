@@ -94,11 +94,21 @@ The application uses a dual-API strategy for maximum reliability:
    - More stable and reliable
    - Supports regular videos, GIFs, and card-type videos (promoted/ad tweets)
 
-2. **GraphQL API (Fallback)**: `twitter.com/i/api/graphql`
-   - Used when Syndication API fails
-   - Requires bearer token and guest token
+2. **Fallback**: the tweet's own page
+   - Used when Syndication API fails or returns no videos
+   - No bearer/guest token or extra API call needed - X server-renders the
+     `TweetResultByRestId` GraphQL result directly into the tweet page as a
+     Relay record, so the fallback just parses that out of the HTML
    - Uses curl-cffi with Chrome 110 browser impersonation to avoid TLS fingerprint blocking
-   - Dynamic Query ID extraction from main.js for automatic adaptation to X API changes
+
+   > **Note**: an older fallback (`get_tokens()`/`get_tweet_details()`/
+   > `create_video_urls()`) scraped a bearer token out of a `main.js` file
+   > referenced by a blank "tweet not found" placeholder page. X's frontend
+   > no longer serves that placeholder-and-redirect flow or that `main.js`
+   > URL pattern at all, so that code path is defunct and unused by
+   > `download_video_for_sc()`. It's still used by the legacy
+   > `download_video()`/`twitter-video-dl.py` entry point, which is
+   > correspondingly untested and not expected to work currently.
 
 ### Key Functions in `twitter_video_dl.py`
 
@@ -109,11 +119,12 @@ The application uses a dual-API strategy for maximum reliability:
   - Supports regular videos from `mediaDetails`
   - Supports card-type videos from `card.binding_values.unified_card` (promoted/ad tweets)
 
-**GraphQL API (Fallback Method):**
+**Fallback Method (embedded tweet page data):**
 
-- `get_tokens(tweet_url)`: Extracts bearer token, guest token, and Query ID using curl-cffi with Chrome 110 browser impersonation
-- `get_tweet_details(tweet_url, guest_token, bearer_token, query_id)`: Calls TweetResultByRestId GraphQL endpoint with dynamically extracted Query ID
-- `create_video_urls(json_data)`: Parses GraphQL response JSON to extract video/image URLs
+- `get_tweet_result_from_page(tweet_url)`: Fetches the tweet page and extracts the embedded `TweetResultByRestId` Relay result (no tokens needed)
+- `extract_media_from_tweet_result(result)`: Extracts video/image URLs from that result
+  - Supports regular videos from `media_entities2`
+  - Supports card-type videos from `card.legacy.binding_values` (promoted/ad tweets)
 
 **Common Functions:**
 
@@ -121,14 +132,14 @@ The application uses a dual-API strategy for maximum reliability:
 - `download_videos(video_urls, ...)`: Downloads videos with optional GIF conversion via FFmpeg
 - `get_img(urls, ...)`: Downloads images if `image.save_option` is enabled
 
-### Auto-Retry Mechanism (GraphQL API Fallback)
+### Auto-Retry Mechanism (legacy GraphQL fallback)
 
-The `get_tweet_details()` function includes smart retry logic (max 10 attempts) that:
+The unused legacy `get_tweet_details()` function includes smart retry logic (max 10 attempts) that:
 
 - Detects missing Twitter API "features" or "variables" from 400 errors
 - Automatically adds required parameters to the request
 - Updates `RequestDetails.json` on successful retry
-- This handles Twitter's frequent API parameter changes
+- This handled Twitter's frequent API parameter changes, back when that endpoint was reachable this way
 
 ### Configuration (`settings.json`)
 
@@ -163,22 +174,18 @@ The `get_tweet_details()` function includes smart retry logic (max 10 attempts) 
 6. Optional: Convert MP4 to GIF for animated tweets
 7. Optional: Download associated images
 
-**Fallback Flow (GraphQL API with curl-cffi):**
+**Fallback Flow (embedded tweet page data):**
 
 Used when Syndication API fails or returns no videos:
 
-1. Normalize URL (twitter.com → x.com to avoid redirects)
-2. Fetch bearer token from Twitter's main.js using curl-cffi
-3. Dynamically extract Query ID from main.js using pattern matching
-4. Get guest token via API using curl-cffi with Chrome 110 browser impersonation
-5. Query TweetResultByRestId GraphQL endpoint with dynamically extracted Query ID
-6. Parse JSON response for video variants (selects highest bitrate)
-7. Handle two video types:
-   - Simple: Single MP4 file
-   - Segmented: MP4 container + multiple M4S chunks (assembled in memory)
-8. Detect reposted videos via `source_status_id_str` and recursively download original
-9. Optional: Convert MP4 to GIF for animated tweets
-10. Optional: Download associated images
+1. Normalize URL (twitter.com → x.com) and validate its host
+2. Fetch the tweet page with curl-cffi (Chrome 110 impersonation)
+3. Find the page's embedded `TweetResultByRestId` Relay record and parse its
+   JSON-escaped `value` string
+4. Extract video variants from `media_entities2` (or `card.legacy.binding_values`
+   for promoted/ad tweets), selecting the highest bitrate
+5. Optional: Convert MP4 to GIF for animated tweets
+6. Optional: Download associated images
 
 ## Testing
 
@@ -187,10 +194,10 @@ Tests are located in `tests/` and use `pytest`. Test URLs are defined in `tests/
 ### Test Files
 
 1. **`test_syndication_api.py`** - Syndication API unit tests (5 tests)
-2. **`test_graphql_api.py`** - GraphQL API unit tests with curl-cffi (7 tests)
+2. **`test_graphql_api.py`** - Fallback method unit tests (embedded tweet page data, 5 tests)
 3. **`test_comprehensive_comparison.py`** - Full test suite using test_data.toml (34 test cases total)
    - Tests Syndication API with all 17 test_data.toml cases
-   - Tests GraphQL API with all 17 test_data.toml cases
+   - Tests the fallback method with all 17 test_data.toml cases
 
 ```bash
 # Run all tests
@@ -234,8 +241,8 @@ Configured in `.pre-commit-config.yaml`:
    - Add parsing logic for new media types
    - Add test case to `tests/test_data.toml`
 
-2. **For GraphQL API** (fallback):
-   - Update regex patterns in `extract_mp4s()` if needed
+2. **For the fallback method**:
+   - Update `extract_media_from_tweet_result()` to handle new JSON structure
    - Add test case to `tests/test_data.toml`
 
 3. Run tests to verify: `uv run pytest tests/`
@@ -266,10 +273,10 @@ Configured in `.pre-commit-config.yaml`:
 ## Known Limitations
 
 - **Syndication API**: Some very old tweets or deleted tweets may not be accessible
-- **GraphQL API Fallback**:
-  - Large segmented videos load entirely in memory (potential OOM for huge files)
+- **Fallback method (embedded tweet page data)**:
   - Requires curl-cffi for TLS fingerprint handling (falls back to standard requests if unavailable)
-  - Dynamic Query ID extraction regex pattern may need updates if X significantly changes main.js structure
+  - Depends on X continuing to embed the `TweetResultByRestId` Relay result in the tweet page; if X changes that rendering approach, `get_tweet_result_from_page()`'s extraction pattern will need updating
+  - The older `get_tokens()`/`get_tweet_details()`/`create_video_urls()` path (scraping a bearer token from `main.js`) is defunct against X's current frontend and unused by `download_video_for_sc()` - see the API Approach section
 - Browser extension only tested on Chrome/Brave
 - iOS Shortcuts only tested on iPhone/iPad (not Mac)
 - Requires FFmpeg for GIF conversion (not needed for iOS Shortcuts with a-Shell)
