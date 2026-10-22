@@ -91,9 +91,9 @@ def test_graphql_api_extract_video_urls():
 
     # Verify video URLs extracted
     assert len(video_urls) > 0, "Should extract at least one video URL"
-    assert all(
-        url.startswith("http") for url in video_urls
-    ), "All video URLs should be valid"
+    assert all(url.startswith("http") for url in video_urls), (
+        "All video URLs should be valid"
+    )
 
     # Verify gif pattern
     assert isinstance(gif_ptn, bool), "gif_ptn should be boolean"
