@@ -389,7 +389,14 @@ def get_tweet_details_syndication(tweet_url):
     for api_url in api_urls:
         debug_write_log(f"Trying API: {api_url}", debug_option)
 
-        response = requests.get(api_url, headers=headers)
+        # Use browser TLS impersonation (as get_tokens() does) so the request
+        # isn't blocked by the fingerprint-based bot detection fronting
+        # cdn.syndication.twimg.com, which is stricter for datacenter IPs
+        # (e.g. CI runners) than for residential ones.
+        if USE_CURL_CFFI:
+            response = requests.get(api_url, headers=headers, impersonate="chrome110")
+        else:
+            response = requests.get(api_url, headers=headers)
 
         debug_write_log(f"API status: {response.status_code}", debug_option)
         debug_write_log(
