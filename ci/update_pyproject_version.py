@@ -8,8 +8,8 @@ from typing import Optional, Tuple
 from tomlkit.toml_file import TOMLFile
 
 
-def update_poetry_project_version(new_tag: str, toml: TOMLFile) -> None:
-    """Update [poetry].[version] in pyproject.toml
+def update_project_version(new_tag: str, toml: TOMLFile) -> None:
+    """Update [project].[version] in pyproject.toml
 
     Args:
         new_tag (str): v[major].[minor].[pathch]
@@ -21,13 +21,13 @@ def update_poetry_project_version(new_tag: str, toml: TOMLFile) -> None:
     toml_data = toml.read()
     try:
         # Update version
-        toml_get_data = toml_data.get("tool")
-        if toml_get_data is not None and "poetry" in toml_get_data:
-            toml_get_data["poetry"]["version"] = new_tag
+        toml_get_data = toml_data.get("project")
+        if toml_get_data is not None and "version" in toml_get_data:
+            toml_get_data["version"] = new_tag
             # Writing the pyproject.toml file
             toml.write(toml_data)
         else:
-            raise KeyError("Failed to find 'poetry' section in 'tool'")
+            raise KeyError("Failed to find 'version' in 'project'")
 
     except Exception as e:
         error_message = f"Failed to update pyproject.toml. Error: {str(e)}"
@@ -64,21 +64,21 @@ def get_arg() -> Optional[str]:
 
 
 def create_ver(input_ver: Optional[str]) -> Tuple[bool, str, TOMLFile]:
-    """Create infomations of [poetry].[version] in pyproject.toml
+    """Create infomations of [project].[version] in pyproject.toml
 
     Args:
         input_ver (Optional[str]): [major].[minor].[pathch]
 
     Returns:
-        Tuple[bool, str, TOMLFile]: Infomation of [poetry].[version] in pyproject.toml
+        Tuple[bool, str, TOMLFile]: Infomation of [project].[version] in pyproject.toml
     """
     # Load the pyproject.toml file
     toml = TOMLFile("pyproject.toml")
     toml_data = toml.read()
-    toml_get_data = toml_data.get("tool")
+    toml_get_data = toml_data.get("project")
     # Update version
-    if toml_get_data is not None and "poetry" in toml_get_data:
-        current_data = toml_get_data["poetry"].get("version")
+    if toml_get_data is not None and "version" in toml_get_data:
+        current_data = toml_get_data.get("version")
     else:
         current_data = "0.0.0"
     major, minor, patch = map(int, current_data.split("."))
@@ -134,5 +134,5 @@ if __name__ == "__main__":  # pragma: no cover
     # With argument: update if version is greater than version of pyproject.toml
     create_tag_flag, new_ver, toml = create_ver(input_ver)
     if create_tag_flag:
-        update_poetry_project_version(new_ver, toml)
+        update_project_version(new_ver, toml)
         subprocess.run(["git", "add", "pyproject.toml"])
