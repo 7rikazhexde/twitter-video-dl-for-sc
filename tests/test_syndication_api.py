@@ -57,9 +57,9 @@ def test_syndication_api_extract_media():
 
     # Verify video URLs extracted
     assert len(video_urls) > 0, "Should extract at least one video URL"
-    assert all(
-        url.startswith("http") for url in video_urls
-    ), "All video URLs should be valid"
+    assert all(url.startswith("http") for url in video_urls), (
+        "All video URLs should be valid"
+    )
 
     # Verify gif pattern
     assert isinstance(gif_ptn, bool), "gif_ptn should be boolean"
@@ -90,9 +90,9 @@ def test_syndication_api_image_tweet():
 
     # Verify both videos and images extracted
     if image_save_option:
-        assert (
-            len(img_urls) > 0
-        ), "Should extract images when image_save_option is enabled"
+        assert len(img_urls) > 0, (
+            "Should extract images when image_save_option is enabled"
+        )
     assert len(video_urls) > 0, "Should extract videos"
 
 
