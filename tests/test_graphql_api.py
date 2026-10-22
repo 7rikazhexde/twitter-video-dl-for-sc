@@ -7,6 +7,7 @@ import shutil
 import pytest
 
 from src.twitter_video_dl.twitter_video_dl import (
+    TwitterVideoDLError,
     create_video_urls,
     get_tokens,
     get_tweet_details,
@@ -126,7 +127,7 @@ def test_graphql_api_invalid_tweet_id():
     """Test GraphQL API handles invalid tweet ID"""
     invalid_url = "https://x.com/tw_7rikazhexde/status/invalid"
 
-    with pytest.raises(AssertionError) as e_info:
+    with pytest.raises(TwitterVideoDLError) as e_info:
         bearer_token, guest_token, query_id = get_tokens(invalid_url)
         get_tweet_details(invalid_url, guest_token, bearer_token, query_id)
 

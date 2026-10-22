@@ -3,6 +3,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import urllib.parse
 
 # Use curl-cffi instead of standard requests for TLS fingerprint handling
@@ -14,6 +15,16 @@ except ImportError:
     import requests
 
     USE_CURL_CFFI = False
+
+
+class TwitterVideoDLError(RuntimeError):
+    """Raised when a request/response from X doesn't look as expected.
+
+    Using a real exception (instead of `assert`, which `python -O` strips
+    entirely) means these checks always run, including in an optimized
+    interpreter.
+    """
+
 
 """
 Hey, thanks for reading the comments.  I love you.
@@ -47,6 +58,10 @@ image_save_option = data["image"]["save_option"]
 # Get debug option
 debug_option = data["debug_option"]
 
+# Default timeout (seconds) for all HTTP requests, so a stalled connection to
+# X's servers can't block the process forever.
+REQUEST_TIMEOUT = 30
+
 
 def delete_debug_log(debug_option=False):
     if debug_option:
@@ -55,6 +70,36 @@ def delete_debug_log(debug_option=False):
             print("Debug log file deleted.")
         else:
             print("Debug log file does not exist.")
+
+
+def confirm_overwrite(output_file_name):
+    """Ask whether to overwrite an existing file.
+
+    When stdin isn't a TTY (CI, iOS Shortcuts, server mode, ...) there is no
+    one to answer the prompt and input() would block forever, so default to
+    overwriting instead.
+    """
+    if not sys.stdin.isatty():
+        print(
+            f"The file '{output_file_name}' already exists. "
+            "No interactive input available, overwriting."
+        )
+        return True
+
+    while True:
+        response = (
+            input(
+                f"The file '{output_file_name}' already exists. Do you want to overwrite it? (y/n): "
+            )
+            .strip()
+            .lower()
+        )
+        if response == "y":
+            return True
+        elif response == "n":
+            return False
+        else:
+            print("Invalid input. Please enter 'y' or 'n'.")
 
 
 def debug_write_log(message, debug_option=False):
@@ -99,12 +144,13 @@ def get_tokens(tweet_url):
     # Persist headers across all requests (like Node.js axios.create())
     session.headers.update(headers)
 
-    response = session.get(tweet_url)
+    response = session.get(tweet_url, timeout=REQUEST_TIMEOUT)
     debug_write_log(response.text, debug_option)
 
-    assert response.status_code == 200, (
-        f"Failed to get tweet page. Status code: {response.status_code}. Tweet url: {tweet_url}"
-    )
+    if not (response.status_code == 200):
+        raise TwitterVideoDLError(
+            f"Failed to get tweet page. Status code: {response.status_code}. Tweet url: {tweet_url}"
+        )
 
     # Multiple redirect detection methods
     redirect_url_match = re.search(
@@ -129,12 +175,13 @@ def get_tokens(tweet_url):
     tok_match = re.search(r'tok=([^&"]+)', redirect_url)
     tok = tok_match.group(1) if tok_match else None
 
-    response = session.get(redirect_url, allow_redirects=False)
+    response = session.get(redirect_url, allow_redirects=False, timeout=REQUEST_TIMEOUT)
     debug_write_log(response.text, debug_option)
 
-    assert response.status_code == 200, (
-        f"Failed to get redirect page. Status code: {response.status_code}. Redirect URL: {redirect_url}"
-    )
+    if not (response.status_code == 200):
+        raise TwitterVideoDLError(
+            f"Failed to get redirect page. Status code: {response.status_code}. Redirect URL: {redirect_url}"
+        )
 
     # Find data parameter (optional)
     data_match = re.search(
@@ -152,15 +199,18 @@ def get_tokens(tweet_url):
 
     # Only send auth request if we have parameters
     if auth_params:
-        response = session.post(auth_url, data=auth_params, allow_redirects=True)
+        response = session.post(
+            auth_url, data=auth_params, allow_redirects=True, timeout=REQUEST_TIMEOUT
+        )
 
         debug_write_log(response.text, debug_option)
 
-        assert response.status_code == 200, (
-            f"Failed to authenticate. Status code: {response.status_code}. Auth URL: {auth_url}"
-        )
+        if not (response.status_code == 200):
+            raise TwitterVideoDLError(
+                f"Failed to authenticate. Status code: {response.status_code}. Auth URL: {auth_url}"
+            )
     else:
-        response = session.get(redirect_url)
+        response = session.get(redirect_url, timeout=REQUEST_TIMEOUT)
 
     # Find main.js URL
     mainjs_urls = re.findall(
@@ -168,16 +218,18 @@ def get_tokens(tweet_url):
         response.text,
     )
 
-    assert mainjs_urls is not None and len(mainjs_urls) > 0, (
-        f"Failed to find main.js file. Tweet url: {tweet_url}"
-    )
+    if not (mainjs_urls is not None and len(mainjs_urls) > 0):
+        raise TwitterVideoDLError(
+            f"Failed to find main.js file. Tweet url: {tweet_url}"
+        )
 
     mainjs_url = mainjs_urls[0]
-    mainjs = session.get(mainjs_url)
+    mainjs = session.get(mainjs_url, timeout=REQUEST_TIMEOUT)
 
-    assert mainjs.status_code == 200, (
-        f"Failed to get main.js file. Status code: {mainjs.status_code}. Tweet url: {tweet_url}"
-    )
+    if not (mainjs.status_code == 200):
+        raise TwitterVideoDLError(
+            f"Failed to get main.js file. Status code: {mainjs.status_code}. Tweet url: {tweet_url}"
+        )
 
     # Multiple methods to find bearer token
     bearer_token = re.findall(r'AAAAAAAAA[^"]+', mainjs.text)
@@ -186,9 +238,10 @@ def get_tokens(tweet_url):
     if not bearer_token:
         bearer_token = re.findall(r'Bearer\s+([^\s"]+)', mainjs.text)
 
-    assert bearer_token is not None and len(bearer_token) > 0, (
-        f"Failed to find bearer token. Tweet url: {tweet_url}, main.js url: {mainjs_url}"
-    )
+    if not (bearer_token is not None and len(bearer_token) > 0):
+        raise TwitterVideoDLError(
+            f"Failed to find bearer token. Tweet url: {tweet_url}, main.js url: {mainjs_url}"
+        )
 
     bearer_token = bearer_token[0]
 
@@ -204,9 +257,10 @@ def get_tokens(tweet_url):
         mainjs.text,
     )
 
-    assert query_id_match is not None, (
-        f"Failed to find query ID in main.js. Tweet url: {tweet_url}, main.js url: {mainjs_url}"
-    )
+    if not (query_id_match is not None):
+        raise TwitterVideoDLError(
+            f"Failed to find query ID in main.js. Tweet url: {tweet_url}, main.js url: {mainjs_url}"
+        )
 
     query_id = query_id_match.group(1)
 
@@ -215,20 +269,22 @@ def get_tokens(tweet_url):
     # Get guest token via API (more reliable with curl-cffi)
     session.headers.update({"authorization": f"Bearer {bearer_token}"})
     guest_token_response = session.post(
-        "https://api.twitter.com/1.1/guest/activate.json"
+        "https://api.twitter.com/1.1/guest/activate.json", timeout=REQUEST_TIMEOUT
     )
 
     debug_write_log(guest_token_response.text, debug_option)
 
-    assert guest_token_response.status_code == 200, (
-        f"Failed to activate guest token. Status code: {guest_token_response.status_code}. Tweet url: {tweet_url}"
-    )
+    if not (guest_token_response.status_code == 200):
+        raise TwitterVideoDLError(
+            f"Failed to activate guest token. Status code: {guest_token_response.status_code}. Tweet url: {tweet_url}"
+        )
 
     guest_token = guest_token_response.json()["guest_token"]
 
-    assert guest_token is not None and len(guest_token) > 0, (
-        f"Failed to find guest token. Tweet url: {tweet_url}, main.js url: {mainjs_url}"
-    )
+    if not (guest_token is not None and len(guest_token) > 0):
+        raise TwitterVideoDLError(
+            f"Failed to find guest token. Tweet url: {tweet_url}, main.js url: {mainjs_url}"
+        )
 
     return bearer_token, guest_token, query_id
 
@@ -244,9 +300,10 @@ def get_details_url(tweet_id, features, variables, query_id):
 def get_tweet_details(tweet_url, guest_token, bearer_token, query_id):
     tweet_id = re.findall(r"(?<=status/)\d+", tweet_url)
 
-    assert tweet_id is not None and len(tweet_id) == 1, (
-        f"Could not parse tweet id from your url.  Make sure you are using the correct url.  If you are, then file a GitHub issue and copy and paste this message.  Tweet url: {tweet_url}"
-    )
+    if not (tweet_id is not None and len(tweet_id) == 1):
+        raise TwitterVideoDLError(
+            f"Could not parse tweet id from your url.  Make sure you are using the correct url.  If you are, then file a GitHub issue and copy and paste this message.  Tweet url: {tweet_url}"
+        )
 
     tweet_id = tweet_id[0]
 
@@ -264,7 +321,7 @@ def get_tweet_details(tweet_url, guest_token, bearer_token, query_id):
         "Content-Type": "application/json",
     }
 
-    details = requests.get(url, headers=headers)
+    details = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
 
     # Log response status and try to parse JSON
     debug_write_log(f"Response status: {details.status_code}", debug_option)
@@ -287,13 +344,14 @@ def get_tweet_details(tweet_url, guest_token, bearer_token, query_id):
         try:
             error_json = json.loads(details.text)
         except json.JSONDecodeError:
-            assert False, (
+            raise TwitterVideoDLError(
                 f"Failed to parse json from details error. details text: {details.text}  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Status code: {details.status_code}.  Tweet url: {tweet_url}"
             )
 
-        assert "errors" in error_json, (
-            f"Failed to find errors in details error json.  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Status code: {details.status_code}.  Tweet url: {tweet_url}"
-        )
+        if "errors" not in error_json:
+            raise TwitterVideoDLError(
+                f"Failed to find errors in details error json.  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Status code: {details.status_code}.  Tweet url: {tweet_url}"
+            )
 
         needed_variable_pattern = re.compile(r"Variable '([^']+)'")
         needed_features_pattern = re.compile(
@@ -312,7 +370,7 @@ def get_tweet_details(tweet_url, guest_token, bearer_token, query_id):
 
         url = get_details_url(tweet_id, features, variables, query_id)
 
-        details = requests.get(url, headers=headers)
+        details = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
 
         # Try to log the response
         try:
@@ -337,9 +395,10 @@ def get_tweet_details(tweet_url, guest_token, bearer_token, query_id):
             with open(request_details_file, "w") as f:
                 json.dump(request_details, f, indent=4)
 
-    assert details.status_code == 200, (
-        f"Failed to get tweet details.  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Status code: {details.status_code}.  Tweet url: {tweet_url}"
-    )
+    if not (details.status_code == 200):
+        raise TwitterVideoDLError(
+            f"Failed to get tweet details.  If you are using the correct Twitter URL this suggests a bug in the script.  Please open a GitHub issue and copy and paste this message.  Status code: {details.status_code}.  Tweet url: {tweet_url}"
+        )
 
     return details
 
@@ -367,9 +426,10 @@ def get_tweet_details_syndication(tweet_url):
 
     tweet_id = re.findall(r"(?<=status/)\d+", tweet_url)
 
-    assert tweet_id is not None and len(tweet_id) == 1, (
-        f"Could not parse tweet id from your url. Tweet url: {tweet_url}"
-    )
+    if not (tweet_id is not None and len(tweet_id) == 1):
+        raise TwitterVideoDLError(
+            f"Could not parse tweet id from your url. Tweet url: {tweet_url}"
+        )
 
     tweet_id = tweet_id[0]
 
@@ -394,9 +454,14 @@ def get_tweet_details_syndication(tweet_url):
         # cdn.syndication.twimg.com, which is stricter for datacenter IPs
         # (e.g. CI runners) than for residential ones.
         if USE_CURL_CFFI:
-            response = requests.get(api_url, headers=headers, impersonate="chrome110")
+            response = requests.get(
+                api_url,
+                headers=headers,
+                impersonate="chrome110",
+                timeout=REQUEST_TIMEOUT,
+            )
         else:
-            response = requests.get(api_url, headers=headers)
+            response = requests.get(api_url, headers=headers, timeout=REQUEST_TIMEOUT)
 
         debug_write_log(f"API status: {response.status_code}", debug_option)
         debug_write_log(
@@ -419,7 +484,7 @@ def get_tweet_details_syndication(tweet_url):
                 continue
 
     # If all API attempts failed, raise error
-    assert False, (
+    raise TwitterVideoDLError(
         f"Failed to get tweet details from any Syndication API endpoint. Tweet url: {tweet_url}"
     )
 
@@ -596,7 +661,7 @@ def extract_mp4s(j, tweet_url, target_all_mp4s=False):
 
 
 def download_parts(url, output_filename):
-    resp = requests.get(url, stream=True)
+    resp = requests.get(url, stream=True, timeout=REQUEST_TIMEOUT)
 
     # container begins with / ends with fmp4 and has a resolution in it we want to capture
     pattern = re.compile(r"(/[^\n]*/(\d+x\d+)/[^\n]*container=fmp4)")
@@ -614,20 +679,24 @@ def download_parts(url, output_filename):
             max_res = res
             max_res_url = url
 
-    assert max_res_url is not None, (
-        f"Could not find a url to download from.  Make sure you are using the correct url.  If you are, then file a GitHub issue and copy and paste this message.  Tweet url: {url}"
-    )
+    if not (max_res_url is not None):
+        raise TwitterVideoDLError(
+            f"Could not find a url to download from.  Make sure you are using the correct url.  If you are, then file a GitHub issue and copy and paste this message.  Tweet url: {url}"
+        )
 
     video_part_prefix = "https://video.twimg.com"
 
-    resp = requests.get(video_part_prefix + max_res_url, stream=True)
+    resp = requests.get(
+        video_part_prefix + max_res_url, stream=True, timeout=REQUEST_TIMEOUT
+    )
 
     mp4_pattern = re.compile(r"(/[^\n]*\.mp4)")
     mp4_parts = mp4_pattern.findall(resp.text)
 
-    assert len(mp4_parts) == 1, (
-        f"There should be exactly 1 mp4 container at this point.  Instead, found {len(mp4_parts)}.  Please open a GitHub issue and copy and paste this message into it.  Tweet url: {url}"
-    )
+    if not (len(mp4_parts) == 1):
+        raise TwitterVideoDLError(
+            f"There should be exactly 1 mp4 container at this point.  Instead, found {len(mp4_parts)}.  Please open a GitHub issue and copy and paste this message into it.  Tweet url: {url}"
+        )
 
     mp4_url = video_part_prefix + mp4_parts[0]
 
@@ -635,7 +704,7 @@ def download_parts(url, output_filename):
     m4s_parts = m4s_part_pattern.findall(resp.text)
 
     with open(output_filename, "wb") as f:
-        r = requests.get(mp4_url, stream=True)
+        r = requests.get(mp4_url, stream=True, timeout=REQUEST_TIMEOUT)
         for chunk in r.iter_content(chunk_size=1024):
             if chunk:
                 f.write(chunk)
@@ -643,7 +712,7 @@ def download_parts(url, output_filename):
 
         for part in m4s_parts:
             part_url = video_part_prefix + part
-            r = requests.get(part_url, stream=True)
+            r = requests.get(part_url, stream=True, timeout=REQUEST_TIMEOUT)
             for chunk in r.iter_content(chunk_size=1024):
                 if chunk:
                     f.write(chunk)
@@ -759,7 +828,7 @@ def download_video(tweet_url, output_file, target_all_videos=False):
 
                     else:
                         # use a stream to download the file
-                        r = requests.get(mp4, stream=True)
+                        r = requests.get(mp4, stream=True, timeout=REQUEST_TIMEOUT)
                         with open(output_file, "wb") as f:
                             for chunk in r.iter_content(chunk_size=1024):
                                 if chunk:
@@ -772,16 +841,17 @@ def download_video(tweet_url, output_file, target_all_videos=False):
         if original_url:
             download_video(original_url, output_file)
         else:
-            assert len(mp4s) > 0, (
-                f"Could not find any mp4s to download.  Make sure you are using the correct url.  If you are, then file a GitHub issue and copy and paste this message.  Tweet url: {tweet_url}"
-            )
+            if not (len(mp4s) > 0):
+                raise TwitterVideoDLError(
+                    f"Could not find any mp4s to download.  Make sure you are using the correct url.  If you are, then file a GitHub issue and copy and paste this message.  Tweet url: {tweet_url}"
+                )
 
             mp4 = mp4s[0]
             if "container" in mp4:
                 download_parts(mp4, output_file)
             else:
                 # use a stream to download the file
-                r = requests.get(mp4, stream=True)
+                r = requests.get(mp4, stream=True, timeout=REQUEST_TIMEOUT)
                 with open(output_file, "wb") as f:
                     for chunk in r.iter_content(chunk_size=1024):
                         if chunk:
@@ -907,24 +977,11 @@ def get_img(urls, file_name, output_folder_path):
         # Ask the user if the file should be overwritten if it exists
         output_file_name = f"{filename}.jpg"
 
-        if os.path.exists(output_file_name):
-            while True:
-                response = (
-                    input(
-                        f"The file '{output_file_name}' already exists. Do you want to overwrite it? (y/n): "
-                    )
-                    .strip()
-                    .lower()
-                )
-                if response == "y":
-                    break
-                elif response == "n":
-                    print("Exit the program.")
-                    return
-                else:
-                    print("Invalid input. Please enter 'y' or 'n'.")
+        if os.path.exists(output_file_name) and not confirm_overwrite(output_file_name):
+            print("Exit the program.")
+            return
 
-        response = requests.get(url, stream=True)
+        response = requests.get(url, stream=True, timeout=REQUEST_TIMEOUT)
         try:
             if response.status_code == 200:
                 with open(output_file_name, "wb") as f:
@@ -1060,24 +1117,11 @@ def download_videos(video_urls, output_file, output_folder_path, gif_ptn):
 
         # Ask the user if the file should be overwritten if it exists
         output_file_name = f"{filename}.mp4"
-        if os.path.exists(output_file_name):
-            while True:
-                response = (
-                    input(
-                        f"The file '{output_file_name}' already exists. Do you want to overwrite it? (y/n): "
-                    )
-                    .strip()
-                    .lower()
-                )
-                if response == "y":
-                    break
-                elif response == "n":
-                    print("Exit the program.")
-                    return
-                else:
-                    print("Invalid input. Please enter 'y' or 'n'.")
+        if os.path.exists(output_file_name) and not confirm_overwrite(output_file_name):
+            print("Exit the program.")
+            return
 
-        response = requests.get(video_url, stream=True)
+        response = requests.get(video_url, stream=True, timeout=REQUEST_TIMEOUT)
         try:
             if response.status_code == 200:
                 with open(output_file_name, "wb") as f:
@@ -1109,7 +1153,7 @@ def download_videos(video_urls, output_file, output_folder_path, gif_ptn):
                 ]
                 subprocess.run(command)
                 # Delete mp4 after creating gif file
-                subprocess.run(["rm", f"{filename}.mp4"])
+                os.remove(f"{filename}.mp4")
                 print(f"Video Convert Success(mp4 to gif): {filename}.gif")
     if image_save_option:
         print("All videos(gifs) & images downloaded successfully.")

@@ -89,9 +89,6 @@ def test_syndication_api_with_all_toml_cases():
                 if expected_file.endswith((".mp4", ".gif")):
                     check_video(file_path, audio_check_flag=acf)
 
-                # Clean up
-                os.remove(file_path)
-
             success_count += 1
             print(f"✅ PASSED: {title}")
 
@@ -100,6 +97,16 @@ def test_syndication_api_with_all_toml_cases():
             failure_cases.append({"title": title, "url": url, "error": str(e)})
             print(f"❌ FAILED: {title}")
             print(f"   Error: {e}")
+
+        finally:
+            # Clean up regardless of outcome, so a failed case (which may
+            # have left a partial download on disk) doesn't cause the next
+            # case reusing the same output filename to hit the "already
+            # exists" overwrite prompt.
+            for expected_file in expected_files:
+                file_path = os.path.join(OUTPUT_FOLDER_PATH, expected_file)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
 
     # Summary
     print(f"\n{'=' * 80}")
@@ -166,9 +173,6 @@ def test_graphql_api_with_all_toml_cases():
                 if expected_file.endswith((".mp4", ".gif")):
                     check_video(file_path, audio_check_flag=acf)
 
-                # Clean up
-                os.remove(file_path)
-
             success_count += 1
             print(f"✅ PASSED: {title}")
 
@@ -177,6 +181,16 @@ def test_graphql_api_with_all_toml_cases():
             failure_cases.append({"title": title, "url": url, "error": str(e)})
             print(f"❌ FAILED: {title}")
             print(f"   Error: {e}")
+
+        finally:
+            # Clean up regardless of outcome, so a failed case (which may
+            # have left a partial download on disk) doesn't cause the next
+            # case reusing the same output filename to hit the "already
+            # exists" overwrite prompt.
+            for expected_file in expected_files:
+                file_path = os.path.join(OUTPUT_FOLDER_PATH, expected_file)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
 
     # Summary
     print(f"\n{'=' * 80}")
