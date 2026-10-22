@@ -26,6 +26,50 @@ class TwitterVideoDLError(RuntimeError):
     """
 
 
+# Hosts a tweet_url is allowed to resolve to before we ever fetch it. Without
+# this, a caller (e.g. the unauthenticated local HTTP server) could pass any
+# URL and have this process fetch it on their behalf (SSRF).
+ALLOWED_TWEET_HOSTS = {
+    "twitter.com",
+    "www.twitter.com",
+    "mobile.twitter.com",
+    "x.com",
+    "www.x.com",
+    "mobile.x.com",
+}
+
+
+def validate_tweet_url(tweet_url):
+    """Reject anything that isn't a twitter.com/x.com link before it's fetched."""
+    parsed = urllib.parse.urlparse(tweet_url)
+    if (
+        parsed.scheme not in ("http", "https")
+        or parsed.hostname not in ALLOWED_TWEET_HOSTS
+    ):
+        raise TwitterVideoDLError(
+            f"Refusing to fetch a non-twitter.com/x.com URL: {tweet_url}"
+        )
+
+
+def sanitize_filename(name):
+    """Reduce a caller-supplied filename to a single safe path segment.
+
+    - `os.path.basename` drops any directory components, so `file_name`
+      can't escape `output_folder_path` (path injection / traversal).
+    - Stripping a leading "-" means the resulting filename can never be
+      mistaken for a flag by ffmpeg or another subprocess we pass it to
+      (argument/command injection).
+    """
+    name = os.path.basename(name.strip())
+    return name.lstrip("-")
+
+
+def safe_media_path(path):
+    """Guarantee a path passed to an external process (ffmpeg) can't be
+    misread as a command-line flag, regardless of how it was built."""
+    return f"./{path}" if path.startswith("-") else path
+
+
 """
 Hey, thanks for reading the comments.  I love you.
 Here's how this works:
@@ -143,6 +187,7 @@ def get_tokens(tweet_url):
 
     # Normalize URL (twitter.com -> x.com)
     tweet_url = tweet_url.replace("https://twitter.com", "https://x.com")
+    validate_tweet_url(tweet_url)
 
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0",
@@ -617,16 +662,16 @@ def get_associated_media_id(j, tweet_url):
 def extract_mp4s(j, tweet_url, target_all_mp4s=False):
     # pattern looks like https://video.twimg.com/amplify_video/1638969830442237953/vid/1080x1920/lXSFa54mAVp7KHim.mp4?tag=16 or https://video.twimg.com/ext_tw_video/1451958820348080133/pu/vid/720x1280/GddnMJ7KszCQQFvA.mp4?tag=12
     amplitude_pattern = re.compile(
-        r"(https://video.twimg.com/amplify_video/(\d+)/vid/(\d+x\d+)/[^.]+.mp4\?tag=\d+)"
+        r"(https://video\.twimg\.com/amplify_video/(\d+)/vid/(\d+x\d+)/[^.]+\.mp4\?tag=\d+)"
     )
     ext_tw_pattern = re.compile(
-        r"(https://video.twimg.com/ext_tw_video/(\d+)/pu/vid/(avc1/)?(\d+x\d+)/[^.]+.mp4\?tag=\d+)"
+        r"(https://video\.twimg\.com/ext_tw_video/(\d+)/pu/vid/(avc1/)?(\d+x\d+)/[^.]+\.mp4\?tag=\d+)"
     )
     # format - https://video.twimg.com/tweet_video/Fvh6brqWAAQhU9p.mp4
-    tweet_video_pattern = re.compile(r'https://video.twimg.com/tweet_video/[^"]+')
+    tweet_video_pattern = re.compile(r'https://video\.twimg\.com/tweet_video/[^"]+')
 
     # https://video.twimg.com/ext_tw_video/1451958820348080133/pu/pl/b-CiC-gZClIwXgDz.m3u8?tag=12&container=fmp4
-    container_pattern = re.compile(r'https://video.twimg.com/[^"]*container=fmp4')
+    container_pattern = re.compile(r'https://video\.twimg\.com/[^"]*container=fmp4')
     media_id = get_associated_media_id(j, tweet_url)
     # find all the matches
     matches = amplitude_pattern.findall(j)
@@ -807,6 +852,9 @@ def repost_check(j, exclude_replies=True):
 
 
 def download_video(tweet_url, output_file, target_all_videos=False):
+    validate_tweet_url(tweet_url)
+    output_file = sanitize_filename(output_file)
+
     # Try Syndication API first (no authentication required)
     try:
         syndication_data = get_tweet_details_syndication(tweet_url)
@@ -965,6 +1013,7 @@ def get_img_url(media_list):
 
 
 def get_img(urls, file_name, output_folder_path):
+    file_name = sanitize_filename(file_name)
     os.makedirs(output_folder_path, exist_ok=True)
     num = len(urls)
     for i, url in enumerate(urls, start=1):
@@ -1103,6 +1152,7 @@ def get_non_card_type_extended_entities_vid_urls(media_list):
 
 
 def download_videos(video_urls, output_file, output_folder_path, gif_ptn):
+    output_file = sanitize_filename(output_file)
     os.makedirs(output_folder_path, exist_ok=True)
     num = len(video_urls)
 
@@ -1151,8 +1201,8 @@ def download_videos(video_urls, output_file, output_folder_path, gif_ptn):
                 command = [
                     "ffmpeg",
                     "-i",
-                    f"{filename}.mp4",
-                    f"{filename}.gif",
+                    safe_media_path(f"{filename}.mp4"),
+                    safe_media_path(f"{filename}.gif"),
                     "-loglevel",
                     ffmpeg_loglevel,
                 ]
@@ -1171,6 +1221,8 @@ def download_video_for_sc(tweet_url, output_file="", output_folder_path="./outpu
 
     # Normalize URL
     tweet_url = tweet_url.replace("https://twitter.com", "https://x.com")
+    validate_tweet_url(tweet_url)
+    output_file = sanitize_filename(output_file)
 
     # Use Syndication API (no authentication required)
     try:
