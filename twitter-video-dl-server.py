@@ -27,7 +27,6 @@ class RequestHandler(BaseHTTPRequestHandler):
 
     def log_message(self, format, *args):
         if DCEBUG_MODE:
-            # Display log only when debug mode is True.
             super().log_message(format, *args)
 
 
