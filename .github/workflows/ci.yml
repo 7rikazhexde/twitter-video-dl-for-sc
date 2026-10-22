@@ -68,8 +68,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # Download a static build directly from a GitHub Release (backed by
+      # GitHub's own CDN) rather than going through apt (hung for 15-25+ min
+      # on a stalled Ubuntu mirror) or FedericoCarboni/setup-ffmpeg (its
+      # version-readme fetch from johnvansickle.com failed intermittently
+      # under this workflow's parallel matrix load, pinning a version didn't
+      # avoid it). curl's own retry handles a single transient blip; the
+      # job-level network dependency is now just GitHub's release CDN.
       - name: Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+        timeout-minutes: 3
+        run: |
+          curl -fsSL --retry 3 --retry-delay 2 -o /tmp/ffmpeg.tar.xz \
+            "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-linux64-gpl.tar.xz"
+          mkdir -p /tmp/ffmpeg-extract
+          tar -xJf /tmp/ffmpeg.tar.xz -C /tmp/ffmpeg-extract --wildcards --no-anchored 'bin/ffmpeg' 'bin/ffprobe'
+          echo "$(dirname "$(find /tmp/ffmpeg-extract -name ffmpeg -type f)")" >> "$GITHUB_PATH"
 
       - name: Install uv
         uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
@@ -85,15 +98,16 @@ jobs:
           uv run pytest tests/test_syndication_api.py
           tests/test_comprehensive_comparison.py::test_syndication_api_with_all_toml_cases
 
-  # GraphQL is the fallback path. It calls x.com directly (not just the
-  # syndication CDN) to scrape a bearer token from main.js, which is far more
-  # sensitive to X changing its page markup - see "Known Limitations" in
-  # CLAUDE.md. This job is deliberately NOT in main's required status checks
-  # (branch protection), so an unrelated X-side change doesn't stop every PR
-  # from merging - but it still reports its real pass/fail here rather than
-  # being masked with continue-on-error, and fail-fast stops the other Python
-  # versions as soon as one fails instead of burning CI minutes on a result
-  # we already know (continue-on-error would otherwise suppress fail-fast).
+  # Fallback path, used when the Syndication API fails. It fetches the tweet
+  # page directly and parses the TweetResultByRestId result X embeds in it,
+  # which is far more sensitive to X changing its page markup than the
+  # Syndication CDN - see "Known Limitations" in CLAUDE.md. This job is
+  # deliberately NOT in main's required status checks (branch protection),
+  # so an unrelated X-side change doesn't stop every PR from merging - but it
+  # still reports its real pass/fail here rather than being masked with
+  # continue-on-error, and fail-fast stops the other Python versions as soon
+  # as one fails instead of burning CI minutes on a result we already know
+  # (continue-on-error would otherwise suppress fail-fast).
   test-graphql-fallback:
     runs-on: ubuntu-latest
     strategy:
@@ -104,8 +118,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      # Download a static build directly from a GitHub Release (backed by
+      # GitHub's own CDN) rather than going through apt (hung for 15-25+ min
+      # on a stalled Ubuntu mirror) or FedericoCarboni/setup-ffmpeg (its
+      # version-readme fetch from johnvansickle.com failed intermittently
+      # under this workflow's parallel matrix load, pinning a version didn't
+      # avoid it). curl's own retry handles a single transient blip; the
+      # job-level network dependency is now just GitHub's release CDN.
       - name: Install ffmpeg
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+        timeout-minutes: 3
+        run: |
+          curl -fsSL --retry 3 --retry-delay 2 -o /tmp/ffmpeg.tar.xz \
+            "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-linux64-gpl.tar.xz"
+          mkdir -p /tmp/ffmpeg-extract
+          tar -xJf /tmp/ffmpeg.tar.xz -C /tmp/ffmpeg-extract --wildcards --no-anchored 'bin/ffmpeg' 'bin/ffprobe'
+          echo "$(dirname "$(find /tmp/ffmpeg-extract -name ffmpeg -type f)")" >> "$GITHUB_PATH"
 
       - name: Install uv
         uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
