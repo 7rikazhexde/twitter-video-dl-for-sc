@@ -62,6 +62,23 @@ debug_option = data["debug_option"]
 # X's servers can't block the process forever.
 REQUEST_TIMEOUT = 30
 
+# Chunk size (bytes) for streaming downloads when NOT using curl_cffi (e.g.
+# environments like iOS a-Shell, where curl_cffi's compiled extension isn't
+# available). curl_cffi's own iter_content() ignores chunk_size entirely (it
+# chunks internally), and warns if given a truthy value - so this is only
+# passed when falling back to plain `requests`, whose iter_content() default
+# is chunk_size=1 (one byte at a time), which is extremely slow for a
+# multi-megabyte video.
+STREAM_CHUNK_SIZE = None if USE_CURL_CFFI else 65536
+
+
+def iter_response_content(response):
+    """Stream a response body in reasonably sized chunks regardless of which
+    HTTP client (curl_cffi or plain requests) is backing it."""
+    for chunk in response.iter_content(chunk_size=STREAM_CHUNK_SIZE):
+        if chunk:
+            yield chunk
+
 
 def delete_debug_log(debug_option=False):
     if debug_option:
@@ -705,18 +722,14 @@ def download_parts(url, output_filename):
 
     with open(output_filename, "wb") as f:
         r = requests.get(mp4_url, stream=True, timeout=REQUEST_TIMEOUT)
-        for chunk in r.iter_content(chunk_size=1024):
-            if chunk:
-                f.write(chunk)
-                f.flush()
+        for chunk in iter_response_content(r):
+            f.write(chunk)
 
         for part in m4s_parts:
             part_url = video_part_prefix + part
             r = requests.get(part_url, stream=True, timeout=REQUEST_TIMEOUT)
-            for chunk in r.iter_content(chunk_size=1024):
-                if chunk:
-                    f.write(chunk)
-                    f.flush()
+            for chunk in iter_response_content(r):
+                f.write(chunk)
 
     return True
 
@@ -830,10 +843,8 @@ def download_video(tweet_url, output_file, target_all_videos=False):
                         # use a stream to download the file
                         r = requests.get(mp4, stream=True, timeout=REQUEST_TIMEOUT)
                         with open(output_file, "wb") as f:
-                            for chunk in r.iter_content(chunk_size=1024):
-                                if chunk:
-                                    f.write(chunk)
-                                    f.flush()
+                            for chunk in iter_response_content(r):
+                                f.write(chunk)
                     video_counter += 1
     else:
         original_url = repost_check(resp.text)
@@ -853,10 +864,8 @@ def download_video(tweet_url, output_file, target_all_videos=False):
                 # use a stream to download the file
                 r = requests.get(mp4, stream=True, timeout=REQUEST_TIMEOUT)
                 with open(output_file, "wb") as f:
-                    for chunk in r.iter_content(chunk_size=1024):
-                        if chunk:
-                            f.write(chunk)
-                            f.flush()
+                    for chunk in iter_response_content(r):
+                        f.write(chunk)
 
 
 def create_video_urls(json_data):
@@ -985,10 +994,8 @@ def get_img(urls, file_name, output_folder_path):
         try:
             if response.status_code == 200:
                 with open(output_file_name, "wb") as f:
-                    # iter_content() without chunk_size to avoid curl-cffi warning
-                    for chunk in response.iter_content():
-                        if chunk:
-                            f.write(chunk)
+                    for chunk in iter_response_content(response):
+                        f.write(chunk)
                     print(f"Image {output_file_name} downloaded successfully.")
             else:
                 print(
@@ -1125,10 +1132,8 @@ def download_videos(video_urls, output_file, output_folder_path, gif_ptn):
         try:
             if response.status_code == 200:
                 with open(output_file_name, "wb") as f:
-                    # iter_content() without chunk_size to avoid curl-cffi warning
-                    for chunk in response.iter_content():
-                        if chunk:
-                            f.write(chunk)
+                    for chunk in iter_response_content(response):
+                        f.write(chunk)
                     print(f"Video {output_file_name} downloaded successfully.")
             else:
                 print(
