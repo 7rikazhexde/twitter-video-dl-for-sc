@@ -13,13 +13,14 @@ on:
       - 'pyproject.toml'
       - 'uv.lock'
       - '.github/workflows/pip-audit.yml'
+  # No path filter here: pip-audit is a required branch-protection check, so
+  # it must report a status on every PR, including ones that don't touch
+  # pyproject.toml/uv.lock (e.g. workflow-only changes) - otherwise GitHub
+  # treats the required check as "never reported" and blocks the merge
+  # indefinitely rather than as skipped/passing.
   pull_request:
     branches:
       - main
-    paths:
-      - 'pyproject.toml'
-      - 'uv.lock'
-      - '.github/workflows/pip-audit.yml'
   schedule:
     - cron: '0 0 * * 1' # Weekly, Monday 00:00 UTC
   workflow_dispatch:
