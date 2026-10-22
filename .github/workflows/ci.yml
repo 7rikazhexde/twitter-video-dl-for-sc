@@ -88,13 +88,16 @@ jobs:
   # GraphQL is the fallback path. It calls x.com directly (not just the
   # syndication CDN) to scrape a bearer token from main.js, which is far more
   # sensitive to X changing its page markup - see "Known Limitations" in
-  # CLAUDE.md. Kept non-blocking so an unrelated X-side change doesn't stop
-  # every PR from merging; failures here are still worth a look.
+  # CLAUDE.md. This job is deliberately NOT in main's required status checks
+  # (branch protection), so an unrelated X-side change doesn't stop every PR
+  # from merging - but it still reports its real pass/fail here rather than
+  # being masked with continue-on-error, and fail-fast stops the other Python
+  # versions as soon as one fails instead of burning CI minutes on a result
+  # we already know (continue-on-error would otherwise suppress fail-fast).
   test-graphql-fallback:
     runs-on: ubuntu-latest
-    continue-on-error: true
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
