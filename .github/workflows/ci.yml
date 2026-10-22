@@ -57,10 +57,10 @@ jobs:
       - name: Ruff format check
         run: uv run ruff format --check twitter-video-dl-for-sc.py twitter-video-dl.py src tests ci
 
-  test:
+  # Syndication API is the primary, reliable download path - required to pass.
+  test-syndication:
     runs-on: ubuntu-latest
     strategy:
-      # Run every Python version even if one fails, so the full matrix status is visible.
       fail-fast: false
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
@@ -80,10 +80,40 @@ jobs:
       - name: Install dependencies
         run: uv sync --extra dev --frozen
 
-      # NOTE: these tests call the live Syndication/GraphQL APIs on x.com.
-      # A failure here can mean a real regression, or it can mean X changed a
-      # page/response shape, or rate-limited/blocked the runner's IP range -
-      # see "Known Limitations" in CLAUDE.md. Check the failure output before
-      # assuming the code change is at fault.
-      - name: Run tests
-        run: uv run pytest tests/
+      - name: Run Syndication API tests
+        run: >
+          uv run pytest tests/test_syndication_api.py
+          tests/test_comprehensive_comparison.py::test_syndication_api_with_all_toml_cases
+
+  # GraphQL is the fallback path. It calls x.com directly (not just the
+  # syndication CDN) to scrape a bearer token from main.js, which is far more
+  # sensitive to X changing its page markup - see "Known Limitations" in
+  # CLAUDE.md. Kept non-blocking so an unrelated X-side change doesn't stop
+  # every PR from merging; failures here are still worth a look.
+  test-graphql-fallback:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@18d369b23da25a81e9458561248e1aafff6a70fa # v10.3.1
+        with:
+          python-version: ${{ matrix.python-version }}
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --extra dev --frozen
+
+      - name: Run GraphQL API tests
+        run: >
+          uv run pytest tests/test_graphql_api.py
+          tests/test_comprehensive_comparison.py::test_graphql_api_with_all_toml_cases
