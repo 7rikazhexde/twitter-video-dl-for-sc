@@ -589,7 +589,7 @@ wheels = [
 
 [[package]]
 name = "twitter-video-dl-for-sc"
-version = "0.4.0"
+version = "0.4.1"
 source = { editable = "." }
 dependencies = [
     { name = "curl-cffi" },
