@@ -62,5 +62,5 @@ tomlkit==0.15.2
     # via twitter-video-dl-for-sc (pyproject.toml)
 urllib3==2.8.0
     # via requests
-virtualenv==21.14.12
+virtualenv==21.14.13
     # via pre-commit
