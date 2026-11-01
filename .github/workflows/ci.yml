@@ -14,19 +14,17 @@ on:
       - 'pyproject.toml'
       - 'uv.lock'
       - '.github/workflows/ci.yml'
+  # No path filter here: lint and test-syndication are required
+  # branch-protection checks on main, so they must report a status on every
+  # PR. A Dependabot PR that only touches requirements-dev.txt (not
+  # pyproject.toml/uv.lock - that mismatch is a separate Dependabot-side
+  # quirk) hit exactly this: no matching path meant no status, and GitHub
+  # treats a required check with no reported status as unsatisfied, not
+  # passing, blocking the merge indefinitely. Same class of bug fixed for
+  # pip-audit.yml's pull_request trigger earlier.
   pull_request:
     branches:
       - main
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - 'ci/**'
-      - 'twitter-video-dl-for-sc.py'
-      - 'twitter-video-dl.py'
-      - 'twitter-video-dl-server.py'
-      - 'pyproject.toml'
-      - 'uv.lock'
-      - '.github/workflows/ci.yml'
   workflow_dispatch:
 
 concurrency:
